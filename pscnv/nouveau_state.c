@@ -861,7 +861,7 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 
 /* Wait until (value(reg) & mask) != val, up until timeout has hit */
 bool nouveau_wait_until_neq(struct drm_device *dev, uint64_t timeout,
-			uint32_t reg, uint32_t mask, uint32_t val)
+			    uint32_t reg, uint32_t mask, uint32_t val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;

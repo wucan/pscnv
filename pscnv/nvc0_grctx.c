@@ -1,6 +1,7 @@
 
 #include "drmP.h"
 #include "nouveau_drv.h"
+#include "nouveau_reg.h"
 #include "pscnv_graph.h"
 #include "pscnv_chan.h"
 
@@ -94,7 +95,20 @@ void
 nvc0_grctx_construct(struct drm_device *dev, struct pscnv_chan *chan)
 {
 	struct pscnv_vspace *vspace = chan->vspace;
-	uint32_t val260;
+	int tp_count;
+	int mp_count[32];
+	int mp_count_max = 0;
+	int i, j, k;
+	uint32_t val260, val520, mp_bitfield;
+
+	tp_count = nv_rd32(dev, NVC0_PGRAPH_TP_REG(0, 0x2608)) >> 16;
+
+	for (i = 0; i < tp_count; ++i) {
+		mp_count[i] =
+			nv_rd32(dev, NVC0_PGRAPH_TP_REG(i, 0x2608)) & 0xffff;
+		if (mp_count_max < mp_count[i])
+			mp_count_max = mp_count[i];
+	}
 
 	val260 = nv_rd32(dev, 0x260);
 	nv_wr32(dev, 0x260, val260 & ~1);
@@ -488,116 +502,50 @@ nvc0_grctx_construct(struct drm_device *dev, struct pscnv_chan *chan)
 	nv_wr32(dev, 0x418808, vspace->obj08004->start >> 8);
 	nv_wr32(dev, 0x41880c, 0x80000018);
 	nv_wr32(dev, 0x405830, 0x02180000);
-	nv_wr32(dev, 0x504520, 0x02180000);
-	nv_wr32(dev, 0x504d20, 0x021802fc);
-	nv_wr32(dev, 0x505520, 0x021805f8);
-	nv_wr32(dev, 0x50c520, 0x021808f4);
-	nv_wr32(dev, 0x50cd20, 0x02180bf0);
-	nv_wr32(dev, 0x50d520, 0x02180eec);
-	nv_wr32(dev, 0x514520, 0x021811e8);
-	nv_wr32(dev, 0x514d20, 0x021814e4);
-	nv_wr32(dev, 0x515520, 0x021817e0);
-	nv_wr32(dev, 0x515d20, 0x02181adc);
-	nv_wr32(dev, 0x51c520, 0x02181dd8);
-	nv_wr32(dev, 0x51cd20, 0x021820d4);
-	nv_wr32(dev, 0x51d520, 0x021823d0);
-	nv_wr32(dev, 0x51dd20, 0x021826cc);
-	nv_wr32(dev, 0x504698, 0x00000000);
-	nv_wr32(dev, 0x5044e8, 0x00000000);
-	nv_wr32(dev, 0x500c10, 0x00000000);
-	nv_wr32(dev, 0x504088, 0x00000000);
-	nv_wr32(dev, 0x500c08, 0x00000003);
-	nv_wr32(dev, 0x500c8c, 0x00000003);
-	nv_wr32(dev, 0x50c698, 0x00000001);
-	nv_wr32(dev, 0x50c4e8, 0x00000001);
-	nv_wr32(dev, 0x508c10, 0x00000001);
-	nv_wr32(dev, 0x50c088, 0x00000001);
-	nv_wr32(dev, 0x508c08, 0x00000003);
-	nv_wr32(dev, 0x508c8c, 0x00000003);
-	nv_wr32(dev, 0x514698, 0x00000002);
-	nv_wr32(dev, 0x5144e8, 0x00000002);
-	nv_wr32(dev, 0x510c10, 0x00000002);
-	nv_wr32(dev, 0x514088, 0x00000002);
-	nv_wr32(dev, 0x510c08, 0x00000004);
-	nv_wr32(dev, 0x510c8c, 0x00000004);
-	nv_wr32(dev, 0x51c698, 0x00000003);
-	nv_wr32(dev, 0x51c4e8, 0x00000003);
-	nv_wr32(dev, 0x518c10, 0x00000003);
-	nv_wr32(dev, 0x51c088, 0x00000003);
-	nv_wr32(dev, 0x518c08, 0x00000004);
-	nv_wr32(dev, 0x518c8c, 0x00000004);
-	nv_wr32(dev, 0x504e98, 0x00000004);
-	nv_wr32(dev, 0x504ce8, 0x00000004);
-	nv_wr32(dev, 0x500c14, 0x00000004);
-	nv_wr32(dev, 0x504888, 0x00000004);
-	nv_wr32(dev, 0x500c08, 0x00000003);
-	nv_wr32(dev, 0x500c8c, 0x00000003);
-	nv_wr32(dev, 0x50ce98, 0x00000005);
-	nv_wr32(dev, 0x50cce8, 0x00000005);
-	nv_wr32(dev, 0x508c14, 0x00000005);
-	nv_wr32(dev, 0x50c888, 0x00000005);
-	nv_wr32(dev, 0x508c08, 0x00000003);
-	nv_wr32(dev, 0x508c8c, 0x00000003);
-	nv_wr32(dev, 0x514e98, 0x00000006);
-	nv_wr32(dev, 0x514ce8, 0x00000006);
-	nv_wr32(dev, 0x510c14, 0x00000006);
-	nv_wr32(dev, 0x514888, 0x00000006);
-	nv_wr32(dev, 0x510c08, 0x00000004);
-	nv_wr32(dev, 0x510c8c, 0x00000004);
-	nv_wr32(dev, 0x51ce98, 0x00000007);
-	nv_wr32(dev, 0x51cce8, 0x00000007);
-	nv_wr32(dev, 0x518c14, 0x00000007);
-	nv_wr32(dev, 0x51c888, 0x00000007);
-	nv_wr32(dev, 0x518c08, 0x00000004);
-	nv_wr32(dev, 0x518c8c, 0x00000004);
-	nv_wr32(dev, 0x505698, 0x00000008);
-	nv_wr32(dev, 0x5054e8, 0x00000008);
-	nv_wr32(dev, 0x500c18, 0x00000008);
-	nv_wr32(dev, 0x505088, 0x00000008);
-	nv_wr32(dev, 0x500c08, 0x00000003);
-	nv_wr32(dev, 0x500c8c, 0x00000003);
-	nv_wr32(dev, 0x50d698, 0x00000009);
-	nv_wr32(dev, 0x50d4e8, 0x00000009);
-	nv_wr32(dev, 0x508c18, 0x00000009);
-	nv_wr32(dev, 0x50d088, 0x00000009);
-	nv_wr32(dev, 0x508c08, 0x00000003);
-	nv_wr32(dev, 0x508c8c, 0x00000003);
-	nv_wr32(dev, 0x515698, 0x0000000a);
-	nv_wr32(dev, 0x5154e8, 0x0000000a);
-	nv_wr32(dev, 0x510c18, 0x0000000a);
-	nv_wr32(dev, 0x515088, 0x0000000a);
-	nv_wr32(dev, 0x510c08, 0x00000004);
-	nv_wr32(dev, 0x510c8c, 0x00000004);
-	nv_wr32(dev, 0x51d698, 0x0000000b);
-	nv_wr32(dev, 0x51d4e8, 0x0000000b);
-	nv_wr32(dev, 0x518c18, 0x0000000b);
-	nv_wr32(dev, 0x51d088, 0x0000000b);
-	nv_wr32(dev, 0x518c08, 0x00000004);
-	nv_wr32(dev, 0x518c8c, 0x00000004);
-	nv_wr32(dev, 0x500c08, 0x00000003);
-	nv_wr32(dev, 0x500c8c, 0x00000003);
-	nv_wr32(dev, 0x508c08, 0x00000003);
-	nv_wr32(dev, 0x508c8c, 0x00000003);
-	nv_wr32(dev, 0x515e98, 0x0000000c);
-	nv_wr32(dev, 0x515ce8, 0x0000000c);
-	nv_wr32(dev, 0x510c1c, 0x0000000c);
-	nv_wr32(dev, 0x515888, 0x0000000c);
-	nv_wr32(dev, 0x510c08, 0x00000004);
-	nv_wr32(dev, 0x510c8c, 0x00000004);
-	nv_wr32(dev, 0x51de98, 0x0000000d);
-	nv_wr32(dev, 0x51dce8, 0x0000000d);
-	nv_wr32(dev, 0x518c1c, 0x0000000d);
-	nv_wr32(dev, 0x51d888, 0x0000000d);
-	nv_wr32(dev, 0x518c08, 0x00000004);
-	nv_wr32(dev, 0x518c8c, 0x00000004);
-	nv_wr32(dev, 0x406028, 0x00004433);
-	nv_wr32(dev, 0x405870, 0x00004433);
+
+	val520 = 0x02180000;
+
+	for (i = 0; i < tp_count; ++i)
+		for (j = 0; j < mp_count[i]; ++j, val520 += 0x2fc)
+			nv_wr32(dev, NVC0_PGRAPH_MP_REG(i, j, 0x520), val520);
+
+	for (i = 0, k = 0; i < mp_count_max; ++i) {
+		for (j = 0; j < tp_count; ++j) {
+			uint32_t addr1 = NVC0_PGRAPH_MP_REG(j, i, 0x698);
+			uint32_t addr2 = NVC0_PGRAPH_MP_REG(j, i, 0x4e8);
+			uint32_t addr3 = NVC0_PGRAPH_TP_REG(j, 0x0c10);
+			uint32_t addr4 = NVC0_PGRAPH_MP_REG(j, i, 0x088);
+			uint32_t addr5 = NVC0_PGRAPH_TP_REG(j, 0x0c08);
+			uint32_t addr6 = NVC0_PGRAPH_TP_REG(j, 0x0c8c);
+
+			if (mp_count[j] > i) {
+				nv_wr32(dev, addr1, k);
+				nv_wr32(dev, addr2, k);
+				nv_wr32(dev, addr3, k);
+				nv_wr32(dev, addr4, k);
+
+				k++;
+			}
+			nv_wr32(dev, addr5, mp_count[j]);
+			nv_wr32(dev, addr6, mp_count[j]);
+		}
+	}
+
+	mp_bitfield = 0;
+
+	for (i = 1; i < tp_count; ++i)
+		mp_bitfield |= mp_count[i] << (i * 4);
+
+	nv_wr32(dev, 0x406028, mp_bitfield);
+	nv_wr32(dev, 0x405870, mp_bitfield);
+
 	nv_wr32(dev, 0x40602c, 0x00000000);
 	nv_wr32(dev, 0x405874, 0x00000000);
 	nv_wr32(dev, 0x406030, 0x00000000);
 	nv_wr32(dev, 0x405878, 0x00000000);
 	nv_wr32(dev, 0x406034, 0x00000000);
 	nv_wr32(dev, 0x40587c, 0x00000000);
+
 	nv_wr32(dev, 0x4060a8, 0x03020100);
 	nv_wr32(dev, 0x4060ac, 0x03020100);
 	nv_wr32(dev, 0x4060b0, 0x03020100);

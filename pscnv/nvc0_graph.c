@@ -70,8 +70,8 @@ nvc0_graph_init_units(struct drm_device *dev)
         nv_wr32(dev, 0x419eb4, nv_rd32(dev, 0x419eb4) | 0x1000);
 }
 
-#define TP_REG(i, r)    ((0x500000 + (i) * 0x8000) + (r))
-#define MP_REG(i, j, r) ((0x504000 + (i) * 0x8000 + (j) * 0x800) + (r))
+#define TP_REG(i, r)    NVC0_PGRAPH_TP_REG(i, r)
+#define MP_REG(i, j, r) NVC0_PGRAPH_MP_REG(i, j, r)
 
 static void
 nvc0_graph_tp_init(struct drm_device *dev)
@@ -170,7 +170,7 @@ void nvc0_ctxctl_load_ctxprog(struct drm_device *dev);
 static int
 nvc0_graph_init_ctxctl(struct drm_device *dev)
 {
-    struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t wait[3];
 	int i, j, tp_num, cx_num;
 
@@ -191,7 +191,7 @@ nvc0_graph_init_ctxctl(struct drm_device *dev)
 	nv_wr32(dev, 0x409500, 0x7fffffff);
 	nv_wr32(dev, 0x409504, 0x21);
 
-	wait[0] = 0x10;
+	wait[0] = 0x10; /* grctx size request */
 	wait[1] = 0x16;
 	wait[2] = 0x25;
 
@@ -203,10 +203,11 @@ nvc0_graph_init_ctxctl(struct drm_device *dev)
 		if (!nv_wait_neq(0x409800, ~0, 0x0))
 			NV_WARN(dev, "WARNING: PGRAPH 0x9800 stalled: %i\n", i);
 
-        if (wait[i] == 0x10) {
-            /* we may need one more round-up. */
-            dev_priv->grctx_size = (nv_rd32(dev, 0x409800) + 0xffff) & ~0xffff;
-        }
+		if (wait[i] == 0x10) {
+			/* we may need one more round-up */
+			dev_priv->grctx_size =
+				(nv_rd32(dev, 0x409800) + 0xffff) & ~0xffff;
+		}
 	}
 
 	/* read stuff I don't know what it is */

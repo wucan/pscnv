@@ -852,3 +852,8 @@
 #define NVC0_PFIFO_PLAY_LIST                                         0x00002270
 #define NVC0_PFIFO_CTX_INST(i)                                (0x3000 + (i) * 8)
 #define NVC0_PFIFO_CTX_STAT(i)                                (0x3004 + (i) * 8)
+
+#define NVC0_PGRAPH_TP_REG(i, r)               ((0x500000 + (i) * 0x8000) + (r))
+#define NVC0_PGRAPH_MP_REG(i, j, r) \
+ ((0x504000 + (i) * 0x8000 + (j) * 0x800) + (r))
+
