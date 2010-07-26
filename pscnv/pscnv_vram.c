@@ -193,7 +193,7 @@ nvc0_vram_calc(struct drm_device *dev)
 	ctrlr_amt = nv_rd32(dev, NVC0_MEM_CTRLR_RAM_AMOUNT);
 
 	dev_priv->vram_size = ctrlr_num * (ctrlr_amt << 20);
-	dev_priv->vram_rblock_size = 0x1000;
+	dev_priv->vram_rblock_size = 0x20000;
 
 	if (!dev_priv->vram_size) {
 		NV_ERROR(dev, "No VRAM detected, aborting.\n");
@@ -428,10 +428,8 @@ nv50_check_tile_flags(int tile_flags, int *lsr)
 }
 
 static inline int
-nvc0_check_tile_flags(int tile_flags, int *lsr)
+nvc0_check_tile_flags(int tile_flags)
 {
-	*lsr = 0;
-
 	switch (tile_flags) {
 	case 0x00:
 	case 0xdb:
@@ -457,8 +455,11 @@ pscnv_vram_alloc(struct drm_device *dev,
 		if (nv50_check_tile_flags(tile_flags, &lsr))
 			return 0;
 	} else {
-		if (nvc0_check_tile_flags(tile_flags, &lsr))
+		if (nvc0_check_tile_flags(tile_flags))
 			return 0;
+		lsr = !!(flags & PSCNV_VO_LARGE_PAGE);
+		if (lsr)
+			size = ALIGN(size, 0x20000);
 	}
 
 	/* avoid all sorts of integer overflows possible otherwise. */

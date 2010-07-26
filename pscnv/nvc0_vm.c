@@ -211,7 +211,7 @@ nvc0_vspace_do_map(struct pscnv_vspace *vs,
 		uint32_t psh, psz;
 		uint64_t phys = reg->start, size = reg->size;
 
-		int s = ((size | offset | phys) & NVC0_LPAGE_MASK) ? 1 : 0;
+		int s = !!(vo->flags & PSCNV_VO_LARGE_PAGE);
 		if (vs->isbar == 3)
 			s = 1;
 	        psh = s ? NVC0_SPAGE_SHIFT : NVC0_LPAGE_SHIFT;

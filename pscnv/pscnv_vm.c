@@ -383,9 +383,15 @@ pscnv_vspace_map(struct pscnv_vspace *vs, struct pscnv_vo *vo,
 {
 	struct drm_nouveau_private *dev_priv = vs->dev->dev_private;
 	struct pscnv_vm_mapnode *node;
-	start += 0xfff;
-	start &= ~0xfffull;
-	end &= ~0xfffull;
+	if (dev_priv->card_type == NV_C0) {
+		start += 0x1ffff;
+		start &= ~0x1ffffull;
+		end &= ~0x1ffffull;
+	} else {
+		start += 0xfff;
+		start &= ~0xfffull;
+		end &= ~0xfffull;
+	}
 	if (end > (1ull << 40))
 		end = 1ull << 40;
 	if (start >= end)
