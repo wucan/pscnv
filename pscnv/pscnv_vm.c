@@ -305,13 +305,17 @@ pscnv_vspace_map_int(struct pscnv_vspace *vs, struct pscnv_vo *vo,
 		uint64_t start, uint64_t end, int back,
 		struct pscnv_vm_mapnode *node)
 {
+	struct drm_nouveau_private *dev_priv = vs->dev->dev_private;
 	struct pscnv_vm_mapnode *left, *right, *res;
 	int lok, rok;
 	uint64_t mstart, mend;
 	left = PSCNV_RB_LEFT(node, entry);
 	right = PSCNV_RB_RIGHT(node, entry);
-	lok = left && left->maxgap >= vo->size && node->start > start;
-	rok = right && right->maxgap >= vo->size && node->start + node->size  < end;
+	uint64_t size = vo->size;
+	if (dev_priv->card_type >= NV_C0)
+		size = ALIGN(size, 0x20000);
+	lok = left && left->maxgap >= size && node->start > start;
+	rok = right && right->maxgap >= size && node->start + node->size  < end;
 	if (pscnv_vm_debug >= 2)
 		NV_INFO (vs->dev, "VM map: %llx %llx %llx %llx %llx %llx %llx %llx %llx %d %d\n", node->start, node->size, node->maxgap,
 				left?left->start:0, left?left->size:0, left?left->maxgap:0,
@@ -332,10 +336,10 @@ pscnv_vspace_map_int(struct pscnv_vspace *vs, struct pscnv_vo *vo,
 	mend = node->start + node->size;
 	if (mend > end)
 		mend = end;
-	if (mstart + vo->size <= mend && !node->vo) {
+	if (mstart + size <= mend && !node->vo) {
 		if (back)
-			mstart = mend - vo->size;
-		mend = mstart + vo->size;
+			mstart = mend - size;
+		mend = mstart + size;
 		if (node->start + node->size != mend) {
 			struct pscnv_vm_mapnode *split = kzalloc(sizeof *split, GFP_KERNEL);
 			if (!split)
