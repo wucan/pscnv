@@ -1,4 +1,4 @@
-PROGS = get_param gem map m2mf loop
+PROGS = get_param gem map m2mf loop 9039
 
 all: $(PROGS)
 
