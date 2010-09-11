@@ -285,6 +285,7 @@ static const char *pgf_cause_str(uint32_t flags)
 	case 0x0: return "PDE not present";
 	case 0x2: return "PTE not present";
 	case 0x3: return "LIMIT exceeded";
+	case 0x5: return "NOUSER flagged";
 	case 0x6: return "PTE set read-only";
 	default:
 		break;
@@ -302,9 +303,9 @@ void nvc0_pfifo_page_fault(struct drm_device *dev, int unit)
 	virt = (virt << 32) | nv_rd32(dev, 0x2804 + unit * 0x10);
 	flags = nv_rd32(dev, 0x280c + unit * 0x10);
 
-	NV_INFO(dev, "%s PAGE FAULT at 0x%010llx (%c, %s)\n",
+	NV_INFO(dev, "%s PAGE FAULT at 0x%010llx (%c, %s, flags %x)\n",
 		pgf_unit_str(unit), virt,
-		(flags & 0x80) ? 'w' : 'r', pgf_cause_str(flags));
+		(flags & 0x80) ? 'w' : 'r', pgf_cause_str(flags), flags);
 }
 
 void nvc0_pfifo_irq_handler(struct drm_device *dev)
