@@ -5485,17 +5485,11 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 			bios->pm.voltages = (struct pm_voltage_entry*)kzalloc(
 				bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry), GFP_KERNEL);
 
-			/* TODO: Try to give all this some sense */
-
 			for (i=0; i<bios->pm.voltage_entry_count; i++) {
-				data_ptr = header_length + (i*entry_size);
+				data_ptr = bios->pm.voltage_tbl_ptr + header_length + (i*entry_size);
 
-				bios->pm.voltages[i].voltage = bios->data[data_ptr+1];
-				bios->pm.voltages[i].index = bios->data[data_ptr+2];
-				NV_INFO(dev, "Read voltage entry %i: voltage=0x%x, index=0x%x\n",
-						 i,
-						 bios->pm.voltages[i].voltage,
-						 bios->pm.voltages[i].index);
+				bios->pm.voltages[i].voltage = bios->data[data_ptr+0];
+				bios->pm.voltages[i].index = bios->data[data_ptr+1];
 			}
 		}
 	} else {
@@ -5532,11 +5526,6 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 			extra_data_count = bios->data[bios->pm.pm_modes_tbl_ptr+4];
 			extra_data_length = bios->data[bios->pm.pm_modes_tbl_ptr+5];
 			data_ptr = bios->pm.pm_modes_tbl_ptr+header_length;
-
-			/*for(i=0; i<200; i++) {
-				NV_INFO(dev, "	0x%x: 0x%x\n",
-						data_ptr+i, bios->data[data_ptr+i]);
-			}*/
 
 			/* Populate the modes */
 			for (i=0, e=0; i < bios->pm.mode_info_count; i++) {
