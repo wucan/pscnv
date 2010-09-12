@@ -5440,6 +5440,158 @@ parse_bit_displayport_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	return 0;
 }
 
+static int
+parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
+				struct bit_entry *bitentry)
+{
+	NV_INFO(dev, "Bios version=0x%x BIT P version is %i\n",
+			bios->major_version, bitentry->id[1]);
+
+	if (!bitentry->offset) {
+		NV_ERROR(dev, "Invalid pointer to the PM table\n");
+		return -EINVAL;
+	}
+
+	/* Get the pointers to the tables */
+	if (bitentry->id[1]==1) {
+		bios->pm.pm_modes_tbl_ptr = ROM16(bios->data[bitentry->offset+0]);
+		bios->pm.voltage_tbl_ptr = ROM16(bios->data[bitentry->offset+16]);
+	} else if (bitentry->id[1]==2) {
+		bios->pm.pm_modes_tbl_ptr = ROM16(bios->data[bitentry->offset+0]);
+		bios->pm.voltage_tbl_ptr = ROM16(bios->data[bitentry->offset+12]);
+	} else {
+		bios->pm.pm_modes_tbl_ptr = 0;
+		bios->pm.voltage_tbl_ptr = 0;
+	
+		NV_ERROR(dev, "BIT-P entry version 0x%x is not supported. PM disabled.\n",
+				 bitentry->id[1]);
+	}
+
+	/* parse the voltage table */
+	if (bios->pm.voltage_tbl_ptr) {
+		uint16_t data_ptr = bios->pm.voltage_tbl_ptr;
+		uint8_t version = bios->data[data_ptr+0];
+
+		if (version == 0x10 || version == 0x12) {
+			/* Geforce 5(FX)/6/7 */
+			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
+		} else if (version == 0x20 || version == 0x30) {
+			/* Geforce 8/9/GT200 */
+			uint8_t header_length = bios->data[data_ptr+1];
+			uint8_t entry_size = bios->data[data_ptr+3];
+			uint8_t i;
+			
+			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
+			bios->pm.voltages = (struct pm_voltage_entry*)kzalloc(
+				bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry), GFP_KERNEL);
+
+			/* TODO: Try to give all this some sense */
+
+			for (i=0; i<bios->pm.voltage_entry_count; i++) {
+				data_ptr = header_length + (i*entry_size);
+
+				bios->pm.voltages[i].voltage = bios->data[data_ptr+1];
+				bios->pm.voltages[i].index = bios->data[data_ptr+2];
+				NV_INFO(dev, "Read voltage entry %i: voltage=0x%x, index=0x%x\n",
+						 i,
+						 bios->pm.voltages[i].voltage,
+						 bios->pm.voltages[i].index);
+			}
+		}
+	} else {
+		NV_ERROR(dev, "This card doesn't have a voltage table\n");
+	}
+
+	/* Parse the pm modes table */
+	if (bios->pm.pm_modes_tbl_ptr) {
+		if (bios->major_version < 0x60) {
+			/* Geforce 5 mode_info header table */
+			/* TODO */
+		} else {
+			/* Geforce 6+ mode_info header table */
+			int i,e;
+			uint8_t table_version, header_length, mode_info_length;
+			uint8_t extra_data_count, extra_data_length;
+			uint16_t data_ptr;
+
+			table_version = bios->data[bios->pm.pm_modes_tbl_ptr+0];
+			if (table_version < 0x21 || table_version > 0x35) {
+				NV_ERROR(dev, "Invalid PM mode info table version 0x%x. PM disabled\n",
+						 table_version);
+				return -EINVAL;
+			}
+
+			/* Allocate some space for the different modes */
+			bios->pm.mode_info_count = bios->data[bios->pm.pm_modes_tbl_ptr+2];
+			bios->pm.pm_modes = (struct pm_mode_info*)kzalloc(
+				bios->pm.mode_info_count*sizeof(struct pm_mode_info), GFP_KERNEL);
+
+			/* Calculate the data ptr */
+			header_length = bios->data[bios->pm.pm_modes_tbl_ptr+1];
+			mode_info_length = bios->data[bios->pm.pm_modes_tbl_ptr+3];
+			extra_data_count = bios->data[bios->pm.pm_modes_tbl_ptr+4];
+			extra_data_length = bios->data[bios->pm.pm_modes_tbl_ptr+5];
+			data_ptr = bios->pm.pm_modes_tbl_ptr+header_length;
+
+			/*for(i=0; i<200; i++) {
+				NV_INFO(dev, "	0x%x: 0x%x\n",
+						data_ptr+i, bios->data[data_ptr+i]);
+			}*/
+
+			/* Populate the modes */
+			for (i=0, e=0; i < bios->pm.mode_info_count; i++) {
+				/* Calculate the offset of the current mode_info */
+				data_ptr = bios->pm.pm_modes_tbl_ptr +
+				    (mode_info_length+(extra_data_count*extra_data_length))*i +
+				    header_length;
+				
+				if (table_version < 0x25) {
+					bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
+					bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+4];
+					bios->pm.pm_modes[e].voltage = bios->data[data_ptr+5];
+					bios->pm.pm_modes[e].coreclk = bios->data[data_ptr+6];
+					bios->pm.pm_modes[e].shaderclk = 0;
+					bios->pm.pm_modes[e].memclk = bios->data[data_ptr+11];
+				} else if (table_version == 0x25) {
+					bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
+					bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+4];
+					bios->pm.pm_modes[e].voltage = bios->data[data_ptr+5];
+					bios->pm.pm_modes[e].coreclk = bios->data[data_ptr+6];
+					bios->pm.pm_modes[e].shaderclk = bios->data[data_ptr+10];
+					bios->pm.pm_modes[e].memclk = bios->data[data_ptr+12];
+				} else if (table_version == 0x30 || table_version == 0x35) {
+					bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
+					bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+6];
+					bios->pm.pm_modes[e].voltage = bios->data[data_ptr+7];
+					bios->pm.pm_modes[e].coreclk = ROM16(bios->data[data_ptr+8]);
+					bios->pm.pm_modes[e].shaderclk = ROM16(bios->data[data_ptr+10]);
+					bios->pm.pm_modes[e].memclk = ROM16(bios->data[data_ptr+12]);
+				}
+
+				/* Check the validity of the entry */
+				if (table_version == 0x35) {
+					uint8_t id = bios->pm.pm_modes[e].id_enabled;
+					if (id == 0x03 || id == 0x05 || id == 0x07 || id == 0x0f)
+						e++;		
+				} else {
+					uint8_t id = bios->pm.pm_modes[e].id_enabled;
+					if (id >= 0x20 && id < 0x24)
+						e++;
+				}
+			}
+
+			/* Update the real mode count (containing only the valid ones */
+			bios->pm.mode_info_count = e;
+
+			NV_INFO(dev, "Found %i PM modes.\n", bios->pm.mode_info_count);
+		}
+	} else {
+			NV_ERROR(dev, "This card doesn't have a PM mode table\n");
+	}
+
+	return 0;
+}
+
 struct bit_table {
 	const char id;
 	int (* const parse_fn)(struct drm_device *, struct nvbios *, struct bit_entry *);
@@ -5501,7 +5653,7 @@ parse_bit_structure(struct nvbios *bios, const uint16_t bitoffset)
 	parse_bit_table(bios, bitoffset, &BIT_TABLE('T', tmds));
 	parse_bit_table(bios, bitoffset, &BIT_TABLE('U', U));
 	parse_bit_table(bios, bitoffset, &BIT_TABLE('d', displayport));
-
+	parse_bit_table(bios, bitoffset, &BIT_TABLE('P', pmtable));
 	return 0;
 }
 
@@ -5705,6 +5857,8 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 
 	if (bmplength > 157)
 		bios->fp.duallink_transition_clk = ROM16(bmp[156]) * 10;
+
+	/* TODO: Parse PM Table */
 
 	return 0;
 }

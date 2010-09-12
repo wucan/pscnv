@@ -41,6 +41,7 @@
 #include "pscnv_chan.h"
 #include "pscnv_fifo.h"
 #include "pscnv_ioctl.h"
+#include "pscnv_pm.h"
 
 static void nouveau_stub_takedown(struct drm_device *dev) {}
 static int nouveau_stub_init(struct drm_device *dev) { return 0; }
@@ -576,6 +577,11 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 			return ret;
 	}
 
+	/* Init power management even without modesetting*/
+	if (pscnv_pm_init(dev)) {
+		NV_ERROR(dev, "Failed to initialize power management\n");
+	}
+
 	return 0;
 }
 
@@ -606,6 +612,10 @@ int nouveau_unload(struct drm_device *dev)
 		nouveau_fbcon_fini(dev);
 		dev_priv->engine.display.destroy(dev);
 		nouveau_close(dev);
+	}
+
+	if (pscnv_pm_fini(dev)) {
+		NV_ERROR(dev, "Failed to initialize power management\n");
 	}
 
 	iounmap(dev_priv->mmio);

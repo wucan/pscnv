@@ -210,6 +210,20 @@ struct pll_lims {
 	int refclk;
 };
 
+struct pm_mode_info {
+	uint8_t id_enabled;
+	uint8_t fan_duty;
+	uint8_t voltage;
+	uint16_t coreclk;
+	uint16_t shaderclk;
+	uint16_t memclk;
+};
+
+struct pm_voltage_entry {
+	uint8_t voltage;
+	uint8_t index;
+};
+
 struct nvbios {
 	struct drm_device *dev;
 
@@ -299,6 +313,17 @@ struct nvbios {
 
 		uint16_t lvds_single_a_script_ptr;
 	} legacy;
+
+	struct {
+		uint16_t pm_modes_tbl_ptr;
+		uint16_t voltage_tbl_ptr;
+
+		uint8_t mode_info_count;
+		struct pm_mode_info* pm_modes;
+
+		uint8_t voltage_entry_count;
+		struct pm_voltage_entry* voltages;
+	} pm;
 };
 
 #endif
