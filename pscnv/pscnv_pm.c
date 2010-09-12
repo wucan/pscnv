@@ -32,7 +32,7 @@ pscnv_calculate_frequency(struct drm_device *dev,
 	/*NV_INFO(dev, "pscnv_calculate_frequency: ref_clk=0x%x, reg0=0x%x, reg1=0x%x, p=0x%x, m=0x%x, n=0x%x\n",
 			refclk, reg0, reg1, p, m, n);*/
 
-	return ((n*refclk/m) >> p)/1000;
+	return ((n*refclk/m) >> p);
 }
 
 static uint32_t
@@ -46,7 +46,7 @@ pscnv_pm_clock_to(struct drm_device *dev, uint32_t reg0_addr,
 	pscnv_parse_clock_regs(reg0, reg1, &m, &n, &p);
 
 	/* TODO: Find a better way to get closer to the needed clock */
-	n = ((wanted_clock_speed*1000)<< p) / (refclk/m);
+	n = ((wanted_clock_speed)<< p) / (refclk/m);
 
 	/* Calculate the new reg1 */
 	reg1 &= 0xFFFF00FF;
@@ -56,11 +56,11 @@ pscnv_pm_clock_to(struct drm_device *dev, uint32_t reg0_addr,
 	 * is not too big
 	 */
 	clock_diff = wanted_clock_speed-pscnv_calculate_frequency(dev, refclk, reg0, reg1);
-	if (clock_diff < wanted_clock_speed/10 || clock_diff > wanted_clock_speed/10) {
-		NV_ERROR(dev, "Will set the 0x%x clock to %u MHz. Clockdiff=%u MHz.\n",
+	if (clock_diff <= wanted_clock_speed/10 || clock_diff >= wanted_clock_speed/10) {
+		NV_ERROR(dev, "Will set the 0x%x clock to %u kHz. Clockdiff=%u kHz.\n",
 				 reg0_addr, wanted_clock_speed, clock_diff);
 
-		/* TODO: Un-comment this when the better pll calculation is done */
+		/* TODO: Un-comment this when the better pll calculation formula is done */
 		/*return 1;*/
 	}
 
@@ -154,9 +154,9 @@ pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 	pm_mode = &dev_p->vbios.pm.pm_modes[id];
 	
 	return snprintf(buf, len, "%s%u: core %u MHz/shader %u MHz/memory %u MHz/%u mV\n",
-					pm_mode->coreclk==pscnv_get_core_clocks(dev)?"*":" ",
-					id, pm_mode->coreclk, pm_mode->shaderclk, pm_mode->memclk,
-					pm_mode->voltage*10);
+					pm_mode->coreclk==pscnv_get_core_clocks(dev)*1000?"*":" ",
+					id, pm_mode->coreclk/1000, pm_mode->shaderclk/1000,
+					pm_mode->memclk/1000, pm_mode->voltage*10);
 }
 
 static ssize_t
@@ -169,10 +169,10 @@ pscnv_get_pm_status(struct device *dev,
 	int ret_length=0, i=0;
 
 	ret_length += snprintf(buf, PAGE_SIZE, "--- Clocks ---\n"
-									"Core    : %u MHz\n"
-									"Core-UNK: %u MHz\n"
-									"Shader  : %u MHz\n"
-									"Memory  : %u MHz\n"
+									"Core    : %u kHz\n"
+									"Core-UNK: %u kHz\n"
+									"Shader  : %u kHz\n"
+									"Memory  : %u kHz\n"
 									"\n"
 									"--- Temperatures ---\n"
 									"Core    : %u °C\n"

@@ -5500,7 +5500,49 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	if (bios->pm.pm_modes_tbl_ptr) {
 		if (bios->major_version < 0x60) {
 			/* Geforce 5 mode_info header table */
-			/* TODO */
+			int i,e;
+			uint8_t table_version, header_length, mode_info_length;
+			uint16_t data_ptr;
+
+			table_version = bios->data[bios->pm.pm_modes_tbl_ptr+1];
+			if (table_version != 0x12 &&
+				table_version != 0x13 &&
+				table_version != 0x15) {
+				NV_ERROR(dev, "Invalid PM mode info table version 0x%x. PM disabled\n",
+						 table_version);
+				return -EINVAL;
+			}
+
+			bios->pm.mode_info_count = bios->data[bios->pm.pm_modes_tbl_ptr+2];
+
+			/* Calculate the data ptr */
+			header_length = bios->data[bios->pm.pm_modes_tbl_ptr+0];
+			mode_info_length = bios->data[bios->pm.pm_modes_tbl_ptr+3];
+
+			/* Populate the modes */
+			for (i=0, e=0; i < bios->pm.mode_info_count; i++) {
+				uint8_t id;
+				/* Calculate the offset of the current mode_info */
+				data_ptr = bios->pm.pm_modes_tbl_ptr + mode_info_length*i +
+				    header_length;
+
+				bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
+				bios->pm.pm_modes[e].coreclk = bios->data[data_ptr+1]*10;
+				bios->pm.pm_modes[e].memclk = bios->data[data_ptr+3]*10;
+				bios->pm.pm_modes[e].shaderclk = 0;
+				bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+55];
+				bios->pm.pm_modes[e].voltage = bios->data[data_ptr+56];
+
+				/* Check the validity of the entry */
+				id = bios->pm.pm_modes[e].id_enabled;
+				if (id == 0x20 || id == 0x60 || id == 0x80)
+					e++;
+			}
+
+			/* Update the real mode count (containing only the valid ones */
+			bios->pm.mode_info_count = e;
+
+			NV_INFO(dev, "Found %i PM modes.\n", bios->pm.mode_info_count);
 		} else {
 			/* Geforce 6+ mode_info header table */
 			int i,e;
@@ -5515,17 +5557,13 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 				return -EINVAL;
 			}
 
-			/* Allocate some space for the different modes */
 			bios->pm.mode_info_count = bios->data[bios->pm.pm_modes_tbl_ptr+2];
-			bios->pm.pm_modes = (struct pm_mode_info*)kzalloc(
-				bios->pm.mode_info_count*sizeof(struct pm_mode_info), GFP_KERNEL);
 
 			/* Calculate the data ptr */
 			header_length = bios->data[bios->pm.pm_modes_tbl_ptr+1];
 			mode_info_length = bios->data[bios->pm.pm_modes_tbl_ptr+3];
 			extra_data_count = bios->data[bios->pm.pm_modes_tbl_ptr+4];
 			extra_data_length = bios->data[bios->pm.pm_modes_tbl_ptr+5];
-			data_ptr = bios->pm.pm_modes_tbl_ptr+header_length;
 
 			/* Populate the modes */
 			for (i=0, e=0; i < bios->pm.mode_info_count; i++) {
@@ -5538,23 +5576,23 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 					bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
 					bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+4];
 					bios->pm.pm_modes[e].voltage = bios->data[data_ptr+5];
-					bios->pm.pm_modes[e].coreclk = bios->data[data_ptr+6];
+					bios->pm.pm_modes[e].coreclk = ROM16(bios->data[data_ptr+6])*1000;
 					bios->pm.pm_modes[e].shaderclk = 0;
-					bios->pm.pm_modes[e].memclk = bios->data[data_ptr+11];
+					bios->pm.pm_modes[e].memclk = ROM16(bios->data[data_ptr+11])*1000;
 				} else if (table_version == 0x25) {
 					bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
 					bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+4];
 					bios->pm.pm_modes[e].voltage = bios->data[data_ptr+5];
-					bios->pm.pm_modes[e].coreclk = bios->data[data_ptr+6];
-					bios->pm.pm_modes[e].shaderclk = bios->data[data_ptr+10];
-					bios->pm.pm_modes[e].memclk = bios->data[data_ptr+12];
+					bios->pm.pm_modes[e].coreclk = ROM16(bios->data[data_ptr+6])*1000;
+					bios->pm.pm_modes[e].shaderclk = ROM16(bios->data[data_ptr+10])*1000;
+					bios->pm.pm_modes[e].memclk = ROM16(bios->data[data_ptr+12])*1000;
 				} else if (table_version == 0x30 || table_version == 0x35) {
 					bios->pm.pm_modes[e].id_enabled = bios->data[data_ptr+0];
 					bios->pm.pm_modes[e].fan_duty = bios->data[data_ptr+6];
 					bios->pm.pm_modes[e].voltage = bios->data[data_ptr+7];
-					bios->pm.pm_modes[e].coreclk = ROM16(bios->data[data_ptr+8]);
-					bios->pm.pm_modes[e].shaderclk = ROM16(bios->data[data_ptr+10]);
-					bios->pm.pm_modes[e].memclk = ROM16(bios->data[data_ptr+12]);
+					bios->pm.pm_modes[e].coreclk = ROM16(bios->data[data_ptr+8])*1000;
+					bios->pm.pm_modes[e].shaderclk = ROM16(bios->data[data_ptr+10])*1000;
+					bios->pm.pm_modes[e].memclk = ROM16(bios->data[data_ptr+12])*1000;
 				}
 
 				/* Check the validity of the entry */
