@@ -138,7 +138,7 @@ pscnv_set_memory_clocks(struct drm_device *dev, uint32_t clock_speed)
 static uint32_t
 pscnv_nv40_sensor_setup(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_p = drm_dev->dev_private;
+	struct drm_nouveau_private *dev_p = dev->dev_private;
 	struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
 	uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
 	uint32_t sensor_calibration;
@@ -152,7 +152,7 @@ pscnv_nv40_sensor_setup(struct drm_device *dev)
 	} else {
 		sensor_calibration |= 0x10000000;
 	}
-	nv_wr32(dev, 0x0015b0);
+	nv_wr32(dev, 0x0015b0, sensor_calibration);
 	
 	/* Wait for the sensor to update */
 	msleep(5);
