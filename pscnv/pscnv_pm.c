@@ -203,7 +203,7 @@ pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 	pm_mode = &dev_p->vbios.pm.pm_modes[id];
 	
 	return snprintf(buf, len, "%s%u: core %u MHz/shader %u MHz/memory %u MHz/%u mV\n",
-					pm_mode->coreclk==pscnv_get_core_clocks(dev)*1000?"*":" ",
+					pm_mode->coreclk==pscnv_get_core_clocks(dev)?"*":" ",
 					id, pm_mode->coreclk/1000, pm_mode->shaderclk/1000,
 					pm_mode->memclk/1000, pm_mode->voltage*10);
 }
