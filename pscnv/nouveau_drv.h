@@ -676,6 +676,7 @@ extern int run_tmds_table(struct drm_device *, struct dcb_entry *,
 			  int head, int pxclk);
 extern int call_lvds_script(struct drm_device *, struct dcb_entry *, int head,
 			    enum LVDS_script, int pxclk);
+extern int vbios_parse_pmtable(struct drm_device *dev);
 
 /* nouveau_dp.c */
 int nouveau_dp_auxch(struct nouveau_i2c_chan *auxch, int cmd, int addr,

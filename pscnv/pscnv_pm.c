@@ -437,6 +437,9 @@ pscnv_pm_init(struct drm_device* dev)
 	/*struct drm_nouveau_private *dev_priv = dev->dev_private;*/
 	int ret;
 
+	/* Parse the vbios PM-related bits */
+	vbios_parse_pmtable(dev);
+
 	/* Set-up the sys entries */
 	ret = device_create_file(dev->dev, &dev_attr_pm_status);
 	if (ret)

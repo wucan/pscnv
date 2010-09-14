@@ -305,8 +305,11 @@ vbios_pmtable_parse_pm_modes(struct drm_device *dev, struct nvbios *bios)
 }
 
 int
-vbios_parse_pmtable(struct drm_device *dev, struct nvbios *bios)
+vbios_parse_pmtable(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_p = dev->dev_private;
+	struct nvbios *bios = &dev_p->vbios;
+	
 	/* parse the thermal table */
 	if (bios->pm.temperature_tbl_ptr) {
 		vbios_pmtable_parse_temperatures(dev, bios);

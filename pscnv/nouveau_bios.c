@@ -5434,6 +5434,11 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	NV_INFO(dev, "Bios version=0x%x BIT P version is %i\n",
 			bios->major_version, bitentry->id[1]);
 
+	/* Set the default values */
+	bios->pm.pm_modes_tbl_ptr = 0;
+	bios->pm.voltage_tbl_ptr = 0;
+	bios->pm.temperature_tbl_ptr = 0;
+
 	if (!bitentry->offset) {
 		NV_ERROR(dev, "Invalid pointer to the PM table. PM disabled.\n");
 		return -EINVAL;
@@ -5449,16 +5454,9 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 		bios->pm.voltage_tbl_ptr = ROM16(bios->data[bitentry->offset+12]);
 		bios->pm.temperature_tbl_ptr = ROM16(bios->data[bitentry->offset+16]);
 	} else {
-		bios->pm.pm_modes_tbl_ptr = 0;
-		bios->pm.voltage_tbl_ptr = 0;
-		bios->pm.temperature_tbl_ptr = 0;
-	
 		NV_ERROR(dev, "BIT-P entry version 0x%x is not supported. PM disabled.\n",
 				 bitentry->id[1]);
 	}
-
-	/* Parse the table */
-	vbios_parse_pmtable(dev, bios);
 
 	return 0;
 }
@@ -5569,6 +5567,10 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 	 * offset + 119: LVDS manufacturer strapping translation table pointer
 	 *
 	 * offset + 142: PLL limits table pointer
+	 *
+	 * offset + 148: pm-modes table pointer
+	 *
+	 * offset + 152: voltage table pointer
 	 *
 	 * offset + 156: minimum pixel clock for LVDS dual link
 	 */
@@ -5726,10 +5728,14 @@ static int parse_bmp_structure(struct drm_device *dev, struct nvbios *bios, unsi
 	if (bmplength > 143)
 		bios->pll_limit_tbl_ptr = ROM16(bmp[142]);
 
+	if (bmplength > 148)
+		bios->pm.pm_modes_tbl_ptr = ROM16(bmp[148]);
+
+	if (bmplength > 152)
+		bios->pm.voltage_tbl_ptr = ROM16(bmp[152]);
+
 	if (bmplength > 157)
 		bios->fp.duallink_transition_clk = ROM16(bmp[156]) * 10;
-
-	/* TODO: Parse PM Table */
 
 	return 0;
 }

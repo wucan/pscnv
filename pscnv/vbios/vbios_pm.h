@@ -29,6 +29,6 @@
 
 #include "../nouveau_bios.h"
 
-int vbios_parse_pmtable(struct drm_device *dev, struct nvbios *bios);
+int vbios_parse_pmtable(struct drm_device *dev);
 
 #endif
