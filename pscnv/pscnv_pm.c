@@ -209,12 +209,12 @@ pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 }
 
 static ssize_t
-pscnv_get_pm_status(struct device *dev,
+pscnv_sysfs_get_pm_status(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
 	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
-	struct drm_nouveau_private *dev_priv = ddev->dev_private;
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
 	int ret_length=0, i=0;
 
 	ret_length += snprintf(buf, PAGE_SIZE, "--- Clocks ---\n"
@@ -226,25 +226,32 @@ pscnv_get_pm_status(struct device *dev,
 									"--- Temperatures ---\n"
 									"Core    : %u °C\n"
 									"\n"
+									"Fan boost temp     : %u °C\n"
+									"GPU throttling temp: %u °C\n"
+									"GPU critical temp  : %u °C\n"
+									"\n"
 									"--- PM Modes ---\n",
 									pscnv_get_core_clocks(ddev),
 									pscnv_get_core_unknown_clocks(ddev),
 									pscnv_get_shader_clocks(ddev),
 									pscnv_get_memory_clocks(ddev),
-									pscnv_get_gpu_temperature(ddev)
+									pscnv_get_gpu_temperature(ddev),
+									dev_p->vbios.pm.temp_fan_boost,
+									dev_p->vbios.pm.temp_throttling,
+									dev_p->vbios.pm.temp_critical
 					);
 
-	for (i=0; i<dev_priv->vbios.pm.mode_info_count; i++)
+	for (i=0; i<dev_p->vbios.pm.mode_info_count; i++)
 		ret_length += pscnv_pm_mode_to_string(ddev, i,
 											 buf+ret_length, PAGE_SIZE-ret_length);
 	
 	return ret_length;
 }
-static DEVICE_ATTR(pm_status, S_IRUGO, pscnv_get_pm_status, NULL);
+static DEVICE_ATTR(pm_status, S_IRUGO, pscnv_sysfs_get_pm_status, NULL);
 
 
 static ssize_t
-pscnv_get_pm_mode(struct device *dev,
+pscnv_sysfs_get_pm_mode(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -258,7 +265,7 @@ pscnv_get_pm_mode(struct device *dev,
 	return pos;
 }
 static ssize_t
-pscnv_set_pm_mode(struct device *dev,
+pscnv_sysfs_set_pm_mode(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf,
 				    size_t count)
@@ -276,12 +283,148 @@ pscnv_set_pm_mode(struct device *dev,
 		pscnv_set_memory_clocks(ddev, pm_mode->memclk);
 
 		/* TODO: Voltage setting */
+
+		/* TODO: Fan Setting */
 	}
 	
 	return count;
 }
-static DEVICE_ATTR(pm_mode, S_IRUGO | S_IWUSR, pscnv_get_pm_mode, pscnv_set_pm_mode);
+static DEVICE_ATTR(pm_mode, S_IRUGO | S_IWUSR, pscnv_sysfs_get_pm_mode,
+				   pscnv_sysfs_set_pm_mode);
 
+static ssize_t
+pscnv_sysfs_get_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+
+	return snprintf(buf, PAGE_SIZE, "%u °C\n", pscnv_get_gpu_temperature(ddev));
+}
+static DEVICE_ATTR(temp_gpu, S_IRUGO, pscnv_sysfs_get_temperature, NULL);
+
+static ssize_t
+pscnv_sysfs_get_critical_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+
+	return snprintf(buf, PAGE_SIZE, "%u °C\n", dev_p->vbios.pm.temp_critical);
+}
+static ssize_t
+pscnv_sysfs_set_critical_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf,
+				    size_t count)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+	unsigned long value;
+
+	/* get the value */
+	if (strict_strtoul(buf, 10, &value) == -EINVAL) {
+		return count;
+	}
+
+	/* Do not let the user set stupid values */
+	if (value < 90) {
+		value = 90;
+	} else if (value > 120) {
+		value = 120;
+	}
+
+	dev_p->vbios.pm.temp_critical = value;
+
+	return count;
+}
+static DEVICE_ATTR(temp_critical, S_IRUGO | S_IWUSR,
+				   pscnv_sysfs_get_critical_temperature,
+				   pscnv_sysfs_set_critical_temperature
+  				);
+
+static ssize_t
+pscnv_sysfs_get_throttling_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+
+	return snprintf(buf, PAGE_SIZE, "%u °C\n", dev_p->vbios.pm.temp_throttling);
+}
+static ssize_t
+pscnv_sysfs_set_throttling_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf,
+				    size_t count)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+	unsigned long value;
+
+	/* get the value */
+	if (strict_strtoul(buf, 10, &value) == -EINVAL) {
+		return count;
+	}
+
+	/* Do not let the user set stupid values */
+	if (value < 60) {
+		value = 60;
+	} else if (value > 115) {
+		value = 115;
+	}
+
+	dev_p->vbios.pm.temp_throttling = value;
+
+	return count;
+}
+static DEVICE_ATTR(temp_throttling, S_IRUGO | S_IWUSR,
+				   pscnv_sysfs_get_throttling_temperature,
+				   pscnv_sysfs_set_throttling_temperature
+  				);
+
+static ssize_t
+pscnv_sysfs_get_fan_boost_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+
+	return snprintf(buf, PAGE_SIZE, "%u °C\n", dev_p->vbios.pm.temp_fan_boost);
+}
+static ssize_t
+pscnv_sysfs_set_fan_boost_temperature(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf,
+				    size_t count)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+	unsigned long value;
+
+	/* get the value */
+	if (strict_strtoul(buf, 10, &value) == -EINVAL) {
+		return count;
+	}
+
+	/* Do not let the user set stupid values */
+	if (value < 30) {
+		value = 30;
+	} else if (value > 100) {
+		value = 100;
+	}
+
+	dev_p->vbios.pm.temp_fan_boost = value;
+
+	return count;
+}
+static DEVICE_ATTR(temp_fan_boost, S_IRUGO | S_IWUSR,
+				   pscnv_sysfs_get_fan_boost_temperature,
+				   pscnv_sysfs_set_fan_boost_temperature
+  				);
 
 int
 pscnv_pm_init(struct drm_device* dev)
@@ -298,6 +441,22 @@ pscnv_pm_init(struct drm_device* dev)
 	if (ret)
 		NV_ERROR(dev, "failed to create device file for pm_mode\n");
 
+	ret = device_create_file(dev->dev, &dev_attr_temp_gpu);
+	if (ret)
+		NV_ERROR(dev, "failed to create device file for temperature\n");
+
+	ret = device_create_file(dev->dev, &dev_attr_temp_critical);
+	if (ret)
+		NV_ERROR(dev, "failed to create device file for critical_temp.\n");
+
+	ret = device_create_file(dev->dev, &dev_attr_temp_throttling);
+	if (ret)
+		NV_ERROR(dev, "failed to create device file for throttling_temp.\n");
+
+	ret = device_create_file(dev->dev, &dev_attr_temp_fan_boost);
+	if (ret)
+		NV_ERROR(dev, "failed to create device file for fan_boost_temp.\n");
+
 	return 0;
 }
 
@@ -308,6 +467,10 @@ pscnv_pm_fini(struct drm_device* dev)
 
 	device_remove_file(dev->dev, &dev_attr_pm_status);
 	device_remove_file(dev->dev, &dev_attr_pm_mode);
-
+	device_remove_file(dev->dev, &dev_attr_temp_gpu);
+	device_remove_file(dev->dev, &dev_attr_temp_critical);
+	device_remove_file(dev->dev, &dev_attr_temp_throttling);
+	device_remove_file(dev->dev, &dev_attr_temp_fan_boost);
+	
 	return 0;
 }
