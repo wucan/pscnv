@@ -162,11 +162,22 @@ vbios_pmtable_parse_voltages(struct drm_device *dev, struct nvbios *bios)
 		header_length = 5;
 		entry_size = bios->data[data_ptr+1];
 		bios->pm.voltage_entry_count = bios->data[data_ptr+2];
+		bios->pm.voltage_mask = bios->data[data_ptr+4];
 	} else if (version == 0x20 || version == 0x30) {
 		/* Geforce 8/9/GT200 */
 		header_length = bios->data[data_ptr+1];
 		bios->pm.voltage_entry_count = bios->data[data_ptr+2];
 		entry_size = bios->data[data_ptr+3];
+		bios->pm.voltage_mask = bios->data[data_ptr+5];
+	} else {
+		NV_ERROR(dev, "PM: Unsupported voltage table 0x%x\n", version);
+		return -EINVAL;
+	}
+
+	if (entry_size < 2) {
+		NV_ERROR(dev, "PM: Voltage table entry size is too small."
+					  "Please report\n");
+		return -EINVAL;
 	}
 
 	/* Read the entries */
@@ -175,12 +186,21 @@ vbios_pmtable_parse_voltages(struct drm_device *dev, struct nvbios *bios)
 			bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry),
 													GFP_KERNEL);
 
-		for (i=0; i<bios->pm.voltage_entry_count; i++) {
-			data_ptr = bios->pm.voltage_tbl_ptr + header_length +
-						(i*entry_size);
+		if (!bios->pm.voltages) {
+			NV_ERROR(dev, "PM: Cannot allocate memory for voltage entries\n");
+			return -EINVAL;
+		}
 
+		data_ptr = bios->pm.voltage_tbl_ptr + header_length;
+		for (i=0; i<bios->pm.voltage_entry_count; i++) {
 			bios->pm.voltages[i].voltage = bios->data[data_ptr+0];
 			bios->pm.voltages[i].index = bios->data[data_ptr+1];
+
+			/* In v30 (bios.major_version 0x70) the index, should be shifted
+			* to indicate the value that is being used */
+			if (version == 0x30)
+					bios->pm.voltages[i].index >>= 2;
+			data_ptr += entry_size;
 		}
 	}
 
@@ -200,8 +220,8 @@ vbios_pmtable_parse_pm_modes(struct drm_device *dev, struct nvbios *bios)
 		if (table_version != 0x12 &&
 			table_version != 0x13 &&
 			table_version != 0x15) {
-			NV_ERROR(dev, "Invalid PM mode info table version 0x%x."
-						"PM disabled\n", table_version);
+			NV_ERROR(dev, "PM: Unsupported PM-mode table version 0x%x."
+						  "Please report to nouveau devs.\n", table_version);
 			return -EINVAL;
 		}
 
@@ -233,8 +253,6 @@ vbios_pmtable_parse_pm_modes(struct drm_device *dev, struct nvbios *bios)
 
 		/* Update the real mode count (containing only the valid ones */
 		bios->pm.mode_info_count = e;
-
-		NV_INFO(dev, "Found %i PM modes.\n", bios->pm.mode_info_count);
 	} else {
 		/* Geforce 6+ mode_info header table */
 		int i,e;
@@ -244,9 +262,8 @@ vbios_pmtable_parse_pm_modes(struct drm_device *dev, struct nvbios *bios)
 
 		table_version = bios->data[bios->pm.pm_modes_tbl_ptr+0];
 		if (table_version < 0x21 || table_version > 0x35) {
-			NV_ERROR(dev, "Invalid PM mode info table version 0x%x."
-						"PM disabled\n",
-						table_version);
+			NV_ERROR(dev, "PM: Unsupported PM-mode table version 0x%x."
+						  "Please report to nouveau devs.\n", table_version);
 			return -EINVAL;
 		}
 
@@ -302,8 +319,6 @@ vbios_pmtable_parse_pm_modes(struct drm_device *dev, struct nvbios *bios)
 
 		/* Update the real mode count (containing only the valid ones */
 		bios->pm.mode_info_count = e;
-
-		NV_INFO(dev, "Found %i PM modes.\n", bios->pm.mode_info_count);
 	}
 
 	return 0;
@@ -319,7 +334,7 @@ vbios_parse_pmtable(struct drm_device *dev)
 	if (bios->pm.temperature_tbl_ptr) {
 		vbios_pmtable_parse_temperatures(dev, bios);
 	} else {
-		NV_ERROR(dev, "This card doesn't have a temperature table."
+		NV_ERROR(dev, "PM: This card doesn't have a temperature table."
 					  "Please report to nouveau devs.\n");
 	}
 
@@ -327,7 +342,7 @@ vbios_parse_pmtable(struct drm_device *dev)
 	if (bios->pm.voltage_tbl_ptr) {
 		vbios_pmtable_parse_voltages(dev, bios);
 	} else {
-		NV_ERROR(dev, "This card doesn't have a voltage table.\n"
+		NV_ERROR(dev, "PM: This card doesn't have a voltage table.\n"
 					  "Please report to nouveau devs.\n");
 	}
 
@@ -335,7 +350,8 @@ vbios_parse_pmtable(struct drm_device *dev)
 	if (bios->pm.pm_modes_tbl_ptr) {
 		vbios_pmtable_parse_pm_modes(dev, bios);
 	} else {
-			NV_ERROR(dev, "This card doesn't have a PM mode table\n");
+			NV_ERROR(dev, "PM: This card doesn't have a PM mode table\n"
+						  "Please report to nouveau devs.\n");
 	}
 
 	return 0;

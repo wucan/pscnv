@@ -331,6 +331,7 @@ struct nvbios {
 		struct pm_mode_info pm_modes[4];
 
 		uint8_t voltage_entry_count;
+		uint8_t voltage_mask;
 		struct pm_voltage_entry* voltages;
 
 		/* Temperature */

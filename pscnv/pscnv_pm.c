@@ -195,6 +195,143 @@ pscnv_get_gpu_temperature(struct drm_device *dev)
 	}
 }
 
+/*
+ * The voltage returned is in 10mV
+ *
+ * Due to masking the index (before writing it) it's possible that the funcion
+ * does not return the correct voltage
+ */
+static uint32_t
+pscnv_get_voltage(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_p = dev->dev_private;
+	uint8_t voltage_entry_count = dev_p->vbios.pm.voltage_entry_count;
+	uint32_t tmp_index, index, i;
+
+	if (dev_p->chipset < 0x50) {
+		NV_INFO(dev, "PM: Voltage readings are not currently supported"
+					 " on chipset nv%x\n",
+				dev_p->chipset);
+		return -EINVAL;
+	}
+
+	tmp_index = (nv_rd32(dev, 0xe104) & ~0x666fffff) >> 20;
+	/* A lovely conversion of the voltage index
+	 * Feel free to introduce a better solution
+	 */
+	switch (tmp_index) {
+	case 0x000:
+		index = 0;
+		break;
+	case 0x001:
+		index = 1;
+		break;
+	case 0x010:
+		index = 2;
+		break;
+	case 0x011:
+		index = 3;
+		break;
+	case 0x100:
+		index = 4;
+		break;
+	case 0x101:
+		index = 5;
+		break;
+	case 0x110:
+		index = 6;
+		break;
+	case 0x111:
+		index = 7;
+		break;
+	default:
+		index = 0xfe;
+	}
+
+	for (i = 0; i < voltage_entry_count; i++) {
+		if (dev_p->vbios.pm.voltages[i].index == index)
+			return dev_p->vbios.pm.voltages[i].voltage;
+	}
+
+	/* None found printf message and exit */
+	NV_ERROR(dev, "PM: The current voltage's id used by the card is unknown.\n");
+	return -EINVAL;
+}
+
+/*
+ * The voltage should be in 10mV
+ */
+static uint32_t
+pscnv_set_voltage(struct drm_device *dev, uint8_t voltage)
+{
+	struct drm_nouveau_private *dev_p = dev->dev_private;
+	uint8_t voltage_entry_count = dev_p->vbios.pm.voltage_entry_count;
+	uint8_t voltage_mask = dev_p->vbios.pm.voltage_mask;
+	uint32_t tmp_index, i;
+
+	if (dev_p->chipset < 0x50) {
+		NV_INFO(dev, "PM: Voltage writes are not currently supported"
+					 " on chipset nv%x\n",
+				dev_p->chipset);
+		return -EINVAL;
+	}
+
+	if (!voltage) {
+		NV_INFO(dev, "PM: voltage should not be zero - Aborting \n");
+		return 0;
+	}
+	if (pscnv_get_voltage(dev) == voltage) {
+		NV_INFO(dev, "PM: The same voltage has already been set\n");
+		return 0;
+	}
+
+	for (i = 0; i < voltage_entry_count; i++) {
+		if (dev_p->vbios.pm.voltages[i].voltage == voltage) {
+			switch (dev_p->vbios.pm.voltages[i].index & voltage_mask) {
+			case 0:
+				tmp_index = 0x000;
+				break;
+			case 1:
+				tmp_index = 0x001;
+				break;
+			case 2:
+				tmp_index = 0x010;
+				break;
+			case 3:
+				tmp_index = 0x011;
+				break;
+			case 4:
+				tmp_index = 0x100;
+				break;
+/* The following are unconfirmed
+ * XXX: Is there a VID over 8?
+ */
+			case 5:
+				tmp_index = 0x101;
+				break;
+			case 6:
+				tmp_index = 0x110;
+				break;
+			case 7:
+				tmp_index = 0x111;
+				break;
+			default:
+				NV_ERROR(dev, "PM: Voltage index %d does not appear to be valid. Please report\n", dev_p->vbios.pm.voltages[i].index);
+				return -EINVAL;
+			}
+			nv_wr32(dev, 0xe104, (nv_rd32(dev, 0xe104) & 0x666fffff) | (tmp_index << 20));
+			return 0;
+		}
+	}
+	/* None found printf message and exit */
+	NV_ERROR(dev, "The specified Voltage %dmV does not have a index\n", voltage*10);
+	return -EINVAL;
+}
+
+/******************************************
+ *              Sysfs Fun                 *
+ *****************************************/
+
 static ssize_t
 pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 						char *buf, ssize_t len)
@@ -211,6 +348,24 @@ pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 					pm_mode->coreclk==pscnv_get_core_clocks(dev)?"*":" ",
 					id, pm_mode->coreclk/1000, pm_mode->shaderclk/1000,
 					pm_mode->memclk/1000, pm_mode->voltage*10);
+}
+
+static ssize_t
+pscnv_voltage_to_string(struct drm_device *dev, unsigned id,
+						char *buf, ssize_t len)
+{
+	struct drm_nouveau_private *dev_p = dev->dev_private;
+	struct pm_voltage_entry* v_entry;
+
+	if (id >= dev_p->vbios.pm.voltage_entry_count)
+		return 0;
+
+	v_entry = &dev_p->vbios.pm.voltages[id];
+
+	return snprintf(buf, len, "%s%u: %u mV\n",
+					v_entry->voltage==pscnv_get_voltage(dev)?"*":" ",
+					id,
+					v_entry->voltage*10);
 }
 
 static ssize_t
@@ -235,7 +390,7 @@ pscnv_sysfs_get_pm_status(struct device *dev,
 									"GPU throttling temp: %u °C\n"
 									"GPU critical temp  : %u °C\n"
 									"\n"
-									"--- PM Modes ---\n",
+									"--- Voltages ---\n",
 									pscnv_get_core_clocks(ddev),
 									pscnv_get_core_unknown_clocks(ddev),
 									pscnv_get_shader_clocks(ddev),
@@ -245,6 +400,13 @@ pscnv_sysfs_get_pm_status(struct device *dev,
 									dev_p->vbios.pm.temp_throttling,
 									dev_p->vbios.pm.temp_critical
 					);
+
+	for (i=0; i<dev_p->vbios.pm.voltage_entry_count; i++)
+		ret_length += pscnv_voltage_to_string(ddev, i,
+											 buf+ret_length, PAGE_SIZE-ret_length);
+
+	ret_length += snprintf(buf+ret_length, PAGE_SIZE-ret_length,
+						   "\n--- PM Modes ---\n");
 
 	for (i=0; i<dev_p->vbios.pm.mode_info_count; i++)
 		ret_length += pscnv_pm_mode_to_string(ddev, i,
@@ -286,8 +448,9 @@ pscnv_sysfs_set_pm_mode(struct device *dev,
 		pscnv_set_core_clocks(ddev, pm_mode->coreclk);
 		pscnv_set_shader_clocks(ddev, pm_mode->shaderclk);
 		pscnv_set_memory_clocks(ddev, pm_mode->memclk);
+		pscnv_set_voltage(ddev, pm_mode->voltage);
 
-		/* TODO: Voltage setting */
+		/* TODO: Set the timings */
 
 		/* TODO: Fan Setting */
 	}
@@ -431,6 +594,46 @@ static DEVICE_ATTR(temp_fan_boost, S_IRUGO | S_IWUSR,
 				   pscnv_sysfs_set_fan_boost_temperature
   				);
 
+static ssize_t
+pscnv_sysfs_get_voltage(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_priv = ddev->dev_private;
+	unsigned pos=0, i=0;
+
+	for (i=0; i<dev_priv->vbios.pm.voltage_entry_count; i++)
+		pos += pscnv_voltage_to_string(ddev, i, buf+pos, PAGE_SIZE-pos);
+
+	return pos;
+}
+static ssize_t
+pscnv_sysfs_set_voltage(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf,
+				    size_t count)
+{
+	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
+	struct drm_nouveau_private *dev_p = ddev->dev_private;
+	struct pm_voltage_entry* v_entry;
+	int id = buf[0]-'0';
+
+	if (id >= dev_p->vbios.pm.voltage_entry_count)
+		return count;
+
+	v_entry = &dev_p->vbios.pm.voltages[id];
+	pscnv_set_voltage(ddev, v_entry->voltage);
+
+	return count;
+}
+static DEVICE_ATTR(pm_voltage, S_IRUGO | S_IWUSR, pscnv_sysfs_get_voltage,
+				   pscnv_sysfs_set_voltage);
+
+/******************************************
+ *            Main functions              *
+ *****************************************/
+
 int
 pscnv_pm_init(struct drm_device* dev)
 {
@@ -465,6 +668,10 @@ pscnv_pm_init(struct drm_device* dev)
 	if (ret)
 		NV_ERROR(dev, "failed to create device file for fan_boost_temp.\n");
 
+	ret = device_create_file(dev->dev, &dev_attr_pm_voltage);
+	if (ret)
+		NV_ERROR(dev, "failed to create device file for fan_boost_temp.\n");
+
 	return 0;
 }
 
@@ -479,6 +686,7 @@ pscnv_pm_fini(struct drm_device* dev)
 	device_remove_file(dev->dev, &dev_attr_temp_critical);
 	device_remove_file(dev->dev, &dev_attr_temp_throttling);
 	device_remove_file(dev->dev, &dev_attr_temp_fan_boost);
+	device_remove_file(dev->dev, &dev_attr_pm_voltage);
 	
 	return 0;
 }
