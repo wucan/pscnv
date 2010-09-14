@@ -5490,7 +5490,7 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 		/* Set the known default values to setup the temperature sensor */
 		bios->pm.nv40_setup.temp_constant = 0;
-		if (dev_p->card_type == NV_40) {
+		if (dev_p->card_type >= NV_40) {
 			switch(dev_p->chipset) {
 				case 0x43:
 					bios->pm.nv40_setup.offset_mult = 32060;
@@ -5528,6 +5528,13 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 					bios->pm.nv40_setup.slope_div = 10000;
 					break;
 					
+				case 0x50:
+					bios->pm.nv40_setup.offset_mult = -22749;
+					bios->pm.nv40_setup.offset_div = 100;
+					bios->pm.nv40_setup.slope_mult = 431;
+					bios->pm.nv40_setup.slope_div = 10000;
+					break;
+
 				default:
 					bios->pm.nv40_setup.offset_mult = 1;
 					bios->pm.nv40_setup.offset_div = 1;

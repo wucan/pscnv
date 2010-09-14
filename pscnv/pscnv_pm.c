@@ -168,7 +168,16 @@ pscnv_get_gpu_temperature(struct drm_device *dev)
 	if (dev_p->chipset >= 0x84) {
 		return nv_rd32(dev, 0x20400);
 	} else if(dev_p->chipset >= 0x50) {
-		return (nv_rd32(dev, 0x20008)*430/10000)-227;
+		struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
+		uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
+		uint32_t temp = nv_rd32(dev, 0x20008);
+
+		temp = temp * nv40_setup->slope_mult / nv40_setup->slope_div;
+		temp = temp + offset + nv40_setup->temp_constant;
+
+		/* TODO: Check the returned value. Please report any issue.*/
+
+		return temp;
 	} else if(dev_p->chipset >= 0x40) {
 		struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
 		uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
@@ -179,7 +188,7 @@ pscnv_get_gpu_temperature(struct drm_device *dev)
 			temp = pscnv_nv40_sensor_setup(dev);
 
 		temp = temp * nv40_setup->slope_mult / nv40_setup->slope_div;
-		temp = temp - offset - nv40_setup->temp_constant;
+		temp = temp + offset + nv40_setup->temp_constant;
 
 		/* TODO: Check the returned value. Please report any issue.*/
 		

@@ -224,9 +224,9 @@ struct pm_voltage_entry {
 	uint8_t index;
 };
 
-struct pm_nv40_sensor_setup {
+struct pm_temp_sensor_setup {
 	uint16_t temp_constant;
-	uint16_t offset_mult;
+	int16_t offset_mult;
 	uint16_t offset_div;
 	uint16_t slope_mult;
 	uint16_t slope_div;
@@ -337,7 +337,7 @@ struct nvbios {
 		uint16_t temp_critical;
 		uint16_t temp_throttling;
 		uint16_t temp_fan_boost;
-		struct pm_nv40_sensor_setup nv40_setup;
+		struct pm_temp_sensor_setup nv40_setup;
 	} pm;
 };
 
