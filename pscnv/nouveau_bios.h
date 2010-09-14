@@ -224,6 +224,21 @@ struct pm_voltage_entry {
 	uint8_t index;
 };
 
+struct pm_thermal_entry {
+	uint8_t id;
+	uint16_t value;
+	uint16_t temp;
+	uint16_t type;
+};
+
+struct pm_nv40_sensor_setup {
+	uint16_t temp_constant;
+	uint16_t offset_mult;
+	uint16_t offset_div;
+	uint16_t slope_mult;
+	uint16_t slope_div;
+};
+
 struct nvbios {
 	struct drm_device *dev;
 
@@ -317,12 +332,19 @@ struct nvbios {
 	struct {
 		uint16_t pm_modes_tbl_ptr;
 		uint16_t voltage_tbl_ptr;
+		uint16_t temperature_tbl_ptr;
 
 		uint8_t mode_info_count;
 		struct pm_mode_info pm_modes[4];
 
 		uint8_t voltage_entry_count;
 		struct pm_voltage_entry* voltages;
+
+		/* Temperature */
+		uint16_t temp_critical;
+		uint16_t temp_throttling;
+		uint16_t temp_fan_boost;
+		struct pm_nv40_sensor_setup nv40_setup;
 	} pm;
 };
 

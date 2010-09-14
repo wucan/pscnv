@@ -46,6 +46,7 @@ pscnv_pm_clock_to(struct drm_device *dev, uint32_t reg0_addr,
 	pscnv_parse_clock_regs(reg0, reg1, &m, &n, &p);
 
 	/* TODO: Find a better way to get closer to the needed clock */
+	/* See http://cgit.freedesktop.org/nouveau/linux-2.6/tree/drivers/gpu/drm/nouveau/nouveau_calc.c */
 	n = ((wanted_clock_speed)<< p) / (refclk/m);
 
 	/* Calculate the new reg1 */
@@ -135,10 +136,58 @@ pscnv_set_memory_clocks(struct drm_device *dev, uint32_t clock_speed)
 }
 
 static uint32_t
+pscnv_nv40_sensor_setup(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_p = drm_dev->dev_private;
+	struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
+	uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
+	uint32_t sensor_calibration;
+	
+	/* set up the sensors */
+	sensor_calibration = 120 - offset - nv40_setup->temp_constant;
+	sensor_calibration = sensor_calibration * nv40_setup->slope_div /
+							nv40_setup->slope_mult;
+	if (dev_p->chipset >= 0x46) {
+		sensor_calibration |= 0x80000000;
+	} else {
+		sensor_calibration |= 0x10000000;
+	}
+	nv_wr32(dev, 0x0015b0);
+	
+	/* Wait for the sensor to update */
+	msleep(5);
+	
+	/* read */
+	return nv_rd32(dev, 0x0015b4);
+}
+
+static uint32_t
 pscnv_get_gpu_temperature(struct drm_device *dev)
 {
-	/* envytools states this register exists only on nv84+, is it true? */
-	return nv_rd32(dev, 0x20400);
+	struct drm_nouveau_private *dev_p = dev->dev_private;
+	if (dev_p->chipset >= 0x84) {
+		return nv_rd32(dev, 0x20400);
+	} else if(dev_p->chipset >= 0x50) {
+		return (nv_rd32(dev, 0x20008)*430/10000)-227;
+	} else if(dev_p->chipset >= 0x40) {
+		struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
+		uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
+		uint32_t temp = nv_rd32(dev, 0x0015b4);
+
+		/* Setup the sensor if the temperature is 0 */
+		if (temp == 0)
+			temp = pscnv_nv40_sensor_setup(dev);
+
+		temp = temp * nv40_setup->slope_mult / nv40_setup->slope_div;
+		temp = temp - offset - nv40_setup->temp_constant;
+
+		/* TODO: Check the returned value. Please report any issue.*/
+		
+		return temp; 
+	} else {
+		NV_ERROR(dev, "Temperature cannot be retrieved from an nv%x card\n", dev_p->chipset);
+		return 0;
+	}
 }
 
 static ssize_t

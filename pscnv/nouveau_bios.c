@@ -5448,25 +5448,154 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 			bios->major_version, bitentry->id[1]);
 
 	if (!bitentry->offset) {
-		NV_ERROR(dev, "Invalid pointer to the PM table\n");
+		NV_ERROR(dev, "Invalid pointer to the PM table. PM disabled.\n");
 		return -EINVAL;
 	}
 
 	/* Get the pointers to the tables */
 	if (bitentry->id[1]==1) {
 		bios->pm.pm_modes_tbl_ptr = ROM16(bios->data[bitentry->offset+0]);
+		bios->pm.temperature_tbl_ptr = ROM16(bios->data[bitentry->offset+12]);
 		bios->pm.voltage_tbl_ptr = ROM16(bios->data[bitentry->offset+16]);
 	} else if (bitentry->id[1]==2) {
 		bios->pm.pm_modes_tbl_ptr = ROM16(bios->data[bitentry->offset+0]);
 		bios->pm.voltage_tbl_ptr = ROM16(bios->data[bitentry->offset+12]);
+		bios->pm.temperature_tbl_ptr = ROM16(bios->data[bitentry->offset+16]);
 	} else {
 		bios->pm.pm_modes_tbl_ptr = 0;
 		bios->pm.voltage_tbl_ptr = 0;
+		bios->pm.temperature_tbl_ptr = 0;
 	
 		NV_ERROR(dev, "BIT-P entry version 0x%x is not supported. PM disabled.\n",
 				 bitentry->id[1]);
 	}
+	
+	/* parse the thermal table */
+	if (bios->pm.temperature_tbl_ptr) {
+		struct drm_nouveau_private *dev_p = dev->dev_private;
+		
+		uint16_t data_ptr = bios->pm.temperature_tbl_ptr;
+		/*uint8_t version = bios->data[data_ptr+0];*/
+		uint8_t header_length = bios->data[data_ptr+1];
+		uint8_t entry_size = bios->data[data_ptr+2];
+		uint8_t entry_count = bios->data[data_ptr+3];
+		uint8_t i, e;
 
+		if (entry_size != 3 ) {
+			NV_ERROR(dev,
+				"Unknow temperature table entry size(%i instead of 3)."
+				" Please send your vbios to the nouveau devs.\n",
+				entry_size);
+		}
+
+		/* Set the known default values to setup the temperature sensor */
+		bios->pm.nv40_setup.temp_constant = 0;
+		if (dev_p->card_type == NV_40) {
+			switch(dev_p->chipset) {
+				case 0x43:
+					bios->pm.nv40_setup.offset_mult = 32060;
+					bios->pm.nv40_setup.offset_div = 1000;
+					bios->pm.nv40_setup.slope_mult = 792;
+					bios->pm.nv40_setup.slope_div = 1000;
+					break;
+
+				case 0x44:
+				case 0x47:
+					bios->pm.nv40_setup.offset_mult = 27839;
+					bios->pm.nv40_setup.offset_div = 1000;
+					bios->pm.nv40_setup.slope_mult = 780;
+					bios->pm.nv40_setup.slope_div = 1000;
+					break;
+
+				case 0x46:
+					bios->pm.nv40_setup.offset_mult = -24775;
+					bios->pm.nv40_setup.offset_div = 100;
+					bios->pm.nv40_setup.slope_mult = 467;
+					bios->pm.nv40_setup.slope_div = 10000;
+					break;
+
+				case 0x49:
+					bios->pm.nv40_setup.offset_mult = -25051;
+					bios->pm.nv40_setup.offset_div = 100;
+					bios->pm.nv40_setup.slope_mult = 458;
+					bios->pm.nv40_setup.slope_div = 10000;
+					break;
+					
+				case 0x4b:
+					bios->pm.nv40_setup.offset_mult = -24088;
+					bios->pm.nv40_setup.offset_div = 100;
+					bios->pm.nv40_setup.slope_mult = 442;
+					bios->pm.nv40_setup.slope_div = 10000;
+					break;
+					
+				default:
+					bios->pm.nv40_setup.offset_mult = 1;
+					bios->pm.nv40_setup.offset_div = 1;
+					bios->pm.nv40_setup.slope_mult = 1;
+					bios->pm.nv40_setup.slope_div = 1;
+			}
+		}
+
+		/* Set sane default values */
+		bios->pm.temp_critical = 110;
+		bios->pm.temp_throttling = 100;
+		bios->pm.temp_fan_boost = 90;
+
+		/* Read the entries from the table */
+		for (i=0, e=0; i<entry_count; i++) {
+			uint16_t value;
+
+			/* set data_ptr to the entry start point */
+			data_ptr = bios->pm.temperature_tbl_ptr +
+						header_length + i*entry_size;
+
+			value = ROM16(bios->data[data_ptr+1]);
+			switch(bios->data[data_ptr+0])
+			{
+				case 0x01:
+					value = (value&0x8f) == 0 ? (value >> 9) & 0x7f : 0;
+					bios->pm.nv40_setup.temp_constant = value;
+					break;
+
+				case 0x04:
+					bios->pm.temp_critical = (value&0x0ff0) >> 4;
+					break;
+
+				case 0x07:
+					bios->pm.temp_throttling = (value&0x0ff0) >> 4;
+					break;
+
+				case 0x08:
+					bios->pm.temp_fan_boost = (value&0x0ff0) >> 4;
+					break;
+
+				case 0x10:
+					bios->pm.nv40_setup.offset_mult = value;
+					break;
+
+				case 0x11:
+					bios->pm.nv40_setup.offset_div = value;
+					break;
+
+				case 0x12:
+					bios->pm.nv40_setup.slope_mult = value;
+					break;
+
+				case 0x13:
+					bios->pm.nv40_setup.slope_div = value;
+					break;
+			}
+		}
+
+		/* Check the values written in the table */
+		if (bios->pm.temp_critical > 120)
+			bios->pm.temp_critical = 120;
+		if (bios->pm.temp_throttling > 110)
+			bios->pm.temp_throttling = 110;
+		if (bios->pm.temp_fan_boost > 100)
+			bios->pm.temp_fan_boost = 100;
+	}
+	
 	/* parse the voltage table */
 	if (bios->pm.voltage_tbl_ptr) {
 		uint16_t data_ptr = bios->pm.voltage_tbl_ptr;
@@ -5483,10 +5612,12 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 			
 			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
 			bios->pm.voltages = (struct pm_voltage_entry*)kzalloc(
-				bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry), GFP_KERNEL);
+				bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry),
+													    GFP_KERNEL);
 
 			for (i=0; i<bios->pm.voltage_entry_count; i++) {
-				data_ptr = bios->pm.voltage_tbl_ptr + header_length + (i*entry_size);
+				data_ptr = bios->pm.voltage_tbl_ptr + header_length +
+						 (i*entry_size);
 
 				bios->pm.voltages[i].voltage = bios->data[data_ptr+0];
 				bios->pm.voltages[i].index = bios->data[data_ptr+1];
@@ -5508,8 +5639,8 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 			if (table_version != 0x12 &&
 				table_version != 0x13 &&
 				table_version != 0x15) {
-				NV_ERROR(dev, "Invalid PM mode info table version 0x%x. PM disabled\n",
-						 table_version);
+				NV_ERROR(dev, "Invalid PM mode info table version 0x%x."
+						    "PM disabled\n", table_version);
 				return -EINVAL;
 			}
 
@@ -5552,7 +5683,8 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 			table_version = bios->data[bios->pm.pm_modes_tbl_ptr+0];
 			if (table_version < 0x21 || table_version > 0x35) {
-				NV_ERROR(dev, "Invalid PM mode info table version 0x%x. PM disabled\n",
+				NV_ERROR(dev, "Invalid PM mode info table version 0x%x."
+						    "PM disabled\n",
 						 table_version);
 				return -EINVAL;
 			}
