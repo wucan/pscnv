@@ -224,13 +224,6 @@ struct pm_voltage_entry {
 	uint8_t index;
 };
 
-struct pm_thermal_entry {
-	uint8_t id;
-	uint16_t value;
-	uint16_t temp;
-	uint16_t type;
-};
-
 struct pm_nv40_sensor_setup {
 	uint16_t temp_constant;
 	uint16_t offset_mult;
