@@ -337,7 +337,7 @@ struct nvbios {
 		uint16_t temp_critical;
 		uint16_t temp_throttling;
 		uint16_t temp_fan_boost;
-		struct pm_temp_sensor_setup nv40_setup;
+		struct pm_temp_sensor_setup sensor_setup;
 	} pm;
 };
 

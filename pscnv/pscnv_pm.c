@@ -139,14 +139,14 @@ static uint32_t
 pscnv_nv40_sensor_setup(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
-	struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
-	uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
+	struct pm_temp_sensor_setup *sensor_setup = &dev_p->vbios.pm.sensor_setup;
+	uint32_t offset = sensor_setup->offset_mult / sensor_setup->offset_div;
 	uint32_t sensor_calibration;
 	
 	/* set up the sensors */
-	sensor_calibration = 120 - offset - nv40_setup->temp_constant;
-	sensor_calibration = sensor_calibration * nv40_setup->slope_div /
-							nv40_setup->slope_mult;
+	sensor_calibration = 120 - offset - sensor_setup->temp_constant;
+	sensor_calibration = sensor_calibration * sensor_setup->slope_div /
+							sensor_setup->slope_mult;
 	if (dev_p->chipset >= 0x46) {
 		sensor_calibration |= 0x80000000;
 	} else {
@@ -165,30 +165,26 @@ static uint32_t
 pscnv_get_gpu_temperature(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
+
 	if (dev_p->chipset >= 0x84) {
 		return nv_rd32(dev, 0x20400);
-	} else if(dev_p->chipset >= 0x50) {
-		struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
-		uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
-		uint32_t temp = nv_rd32(dev, 0x20008);
-
-		temp = temp * nv40_setup->slope_mult / nv40_setup->slope_div;
-		temp = temp + offset + nv40_setup->temp_constant;
-
-		/* TODO: Check the returned value. Please report any issue.*/
-
-		return temp;
 	} else if(dev_p->chipset >= 0x40) {
-		struct pm_nv40_sensor_setup *nv40_setup = &dev_p->vbios.pm.nv40_setup;
-		uint32_t offset = nv40_setup->offset_mult / nv40_setup->offset_div;
-		uint32_t temp = nv_rd32(dev, 0x0015b4);
+		struct pm_temp_sensor_setup *sensor_setup = &dev_p->vbios.pm.sensor_setup;
+		uint32_t offset = sensor_setup->offset_mult / sensor_setup->offset_div;
+		uint32_t temp;
+
+		if(dev_p->chipset >= 0x50) {
+			temp = nv_rd32(dev, 0x20008);
+		} else {
+			temp = nv_rd32(dev, 0x0015b4);
+		}
 
 		/* Setup the sensor if the temperature is 0 */
 		if (temp == 0)
 			temp = pscnv_nv40_sensor_setup(dev);
 
-		temp = temp * nv40_setup->slope_mult / nv40_setup->slope_div;
-		temp = temp + offset + nv40_setup->temp_constant;
+		temp = temp * sensor_setup->slope_mult / sensor_setup->slope_div;
+		temp = temp + offset + sensor_setup->temp_constant;
 
 		/* TODO: Check the returned value. Please report any issue.*/
 		

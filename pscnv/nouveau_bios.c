@@ -5489,57 +5489,57 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 		}
 
 		/* Set the known default values to setup the temperature sensor */
-		bios->pm.nv40_setup.temp_constant = 0;
+		bios->pm.sensor_setup.temp_constant = 0;
 		if (dev_p->card_type >= NV_40) {
 			switch(dev_p->chipset) {
 				case 0x43:
-					bios->pm.nv40_setup.offset_mult = 32060;
-					bios->pm.nv40_setup.offset_div = 1000;
-					bios->pm.nv40_setup.slope_mult = 792;
-					bios->pm.nv40_setup.slope_div = 1000;
+					bios->pm.sensor_setup.offset_mult = 32060;
+					bios->pm.sensor_setup.offset_div = 1000;
+					bios->pm.sensor_setup.slope_mult = 792;
+					bios->pm.sensor_setup.slope_div = 1000;
 					break;
 
 				case 0x44:
 				case 0x47:
-					bios->pm.nv40_setup.offset_mult = 27839;
-					bios->pm.nv40_setup.offset_div = 1000;
-					bios->pm.nv40_setup.slope_mult = 780;
-					bios->pm.nv40_setup.slope_div = 1000;
+					bios->pm.sensor_setup.offset_mult = 27839;
+					bios->pm.sensor_setup.offset_div = 1000;
+					bios->pm.sensor_setup.slope_mult = 780;
+					bios->pm.sensor_setup.slope_div = 1000;
 					break;
 
 				case 0x46:
-					bios->pm.nv40_setup.offset_mult = -24775;
-					bios->pm.nv40_setup.offset_div = 100;
-					bios->pm.nv40_setup.slope_mult = 467;
-					bios->pm.nv40_setup.slope_div = 10000;
+					bios->pm.sensor_setup.offset_mult = -24775;
+					bios->pm.sensor_setup.offset_div = 100;
+					bios->pm.sensor_setup.slope_mult = 467;
+					bios->pm.sensor_setup.slope_div = 10000;
 					break;
 
 				case 0x49:
-					bios->pm.nv40_setup.offset_mult = -25051;
-					bios->pm.nv40_setup.offset_div = 100;
-					bios->pm.nv40_setup.slope_mult = 458;
-					bios->pm.nv40_setup.slope_div = 10000;
+					bios->pm.sensor_setup.offset_mult = -25051;
+					bios->pm.sensor_setup.offset_div = 100;
+					bios->pm.sensor_setup.slope_mult = 458;
+					bios->pm.sensor_setup.slope_div = 10000;
 					break;
 					
 				case 0x4b:
-					bios->pm.nv40_setup.offset_mult = -24088;
-					bios->pm.nv40_setup.offset_div = 100;
-					bios->pm.nv40_setup.slope_mult = 442;
-					bios->pm.nv40_setup.slope_div = 10000;
+					bios->pm.sensor_setup.offset_mult = -24088;
+					bios->pm.sensor_setup.offset_div = 100;
+					bios->pm.sensor_setup.slope_mult = 442;
+					bios->pm.sensor_setup.slope_div = 10000;
 					break;
 					
 				case 0x50:
-					bios->pm.nv40_setup.offset_mult = -22749;
-					bios->pm.nv40_setup.offset_div = 100;
-					bios->pm.nv40_setup.slope_mult = 431;
-					bios->pm.nv40_setup.slope_div = 10000;
+					bios->pm.sensor_setup.offset_mult = -22749;
+					bios->pm.sensor_setup.offset_div = 100;
+					bios->pm.sensor_setup.slope_mult = 431;
+					bios->pm.sensor_setup.slope_div = 10000;
 					break;
 
 				default:
-					bios->pm.nv40_setup.offset_mult = 1;
-					bios->pm.nv40_setup.offset_div = 1;
-					bios->pm.nv40_setup.slope_mult = 1;
-					bios->pm.nv40_setup.slope_div = 1;
+					bios->pm.sensor_setup.offset_mult = 1;
+					bios->pm.sensor_setup.offset_div = 1;
+					bios->pm.sensor_setup.slope_mult = 1;
+					bios->pm.sensor_setup.slope_div = 1;
 			}
 		}
 
@@ -5561,7 +5561,7 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 			{
 				case 0x01:
 					value = (value&0x8f) == 0 ? (value >> 9) & 0x7f : 0;
-					bios->pm.nv40_setup.temp_constant = value;
+					bios->pm.sensor_setup.temp_constant = value;
 					break;
 
 				case 0x04:
@@ -5577,19 +5577,19 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 					break;
 
 				case 0x10:
-					bios->pm.nv40_setup.offset_mult = value;
+					bios->pm.sensor_setup.offset_mult = value;
 					break;
 
 				case 0x11:
-					bios->pm.nv40_setup.offset_div = value;
+					bios->pm.sensor_setup.offset_div = value;
 					break;
 
 				case 0x12:
-					bios->pm.nv40_setup.slope_mult = value;
+					bios->pm.sensor_setup.slope_mult = value;
 					break;
 
 				case 0x13:
-					bios->pm.nv40_setup.slope_div = value;
+					bios->pm.sensor_setup.slope_div = value;
 					break;
 			}
 		}
@@ -5607,33 +5607,24 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	if (bios->pm.voltage_tbl_ptr) {
 		uint16_t data_ptr = bios->pm.voltage_tbl_ptr;
 		uint8_t version = bios->data[data_ptr+0];
-		uint8_t header_length;
-		uint8_t entry_size;
-		uint8_t i;
-
-		bios->pm.voltage_entry_count = 0;
 
 		if (version == 0x10 || version == 0x12) {
 			/* Geforce 5(FX)/6/7 */
-			header_length = 5;
-			entry_size = bios->data[data_ptr+1];
 			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
 		} else if (version == 0x20 || version == 0x30) {
 			/* Geforce 8/9/GT200 */
-			header_length = bios->data[data_ptr+1];
+			uint8_t header_length = bios->data[data_ptr+1];
+			uint8_t entry_size = bios->data[data_ptr+3];
+			uint8_t i;
+			
 			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
-			entry_size = bios->data[data_ptr+3];
-		}
-
-		/* Read the entries */
-		if (bios->pm.voltage_entry_count > 0) {
 			bios->pm.voltages = (struct pm_voltage_entry*)kzalloc(
 				bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry),
-														GFP_KERNEL);
+													    GFP_KERNEL);
 
 			for (i=0; i<bios->pm.voltage_entry_count; i++) {
 				data_ptr = bios->pm.voltage_tbl_ptr + header_length +
-							(i*entry_size);
+						 (i*entry_size);
 
 				bios->pm.voltages[i].voltage = bios->data[data_ptr+0];
 				bios->pm.voltages[i].index = bios->data[data_ptr+1];
