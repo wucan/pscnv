@@ -5607,24 +5607,33 @@ parse_bit_pmtable_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	if (bios->pm.voltage_tbl_ptr) {
 		uint16_t data_ptr = bios->pm.voltage_tbl_ptr;
 		uint8_t version = bios->data[data_ptr+0];
+		uint8_t header_length;
+		uint8_t entry_size;
+		uint8_t i;
+
+		bios->pm.voltage_entry_count = 0;
 
 		if (version == 0x10 || version == 0x12) {
 			/* Geforce 5(FX)/6/7 */
+			header_length = 5;
+			entry_size = bios->data[data_ptr+1];
 			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
 		} else if (version == 0x20 || version == 0x30) {
 			/* Geforce 8/9/GT200 */
-			uint8_t header_length = bios->data[data_ptr+1];
-			uint8_t entry_size = bios->data[data_ptr+3];
-			uint8_t i;
-			
+			header_length = bios->data[data_ptr+1];
 			bios->pm.voltage_entry_count = bios->data[data_ptr+2];
+			entry_size = bios->data[data_ptr+3];
+		}
+
+		/* Read the entries */
+		if (bios->pm.voltage_entry_count > 0) {
 			bios->pm.voltages = (struct pm_voltage_entry*)kzalloc(
 				bios->pm.voltage_entry_count*sizeof(struct pm_voltage_entry),
-													    GFP_KERNEL);
+														GFP_KERNEL);
 
 			for (i=0; i<bios->pm.voltage_entry_count; i++) {
 				data_ptr = bios->pm.voltage_tbl_ptr + header_length +
-						 (i*entry_size);
+							(i*entry_size);
 
 				bios->pm.voltages[i].voltage = bios->data[data_ptr+0];
 				bios->pm.voltages[i].index = bios->data[data_ptr+1];
