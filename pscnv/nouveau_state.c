@@ -578,7 +578,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	/* Init power management even without modesetting*/
-	if (pscnv_pm_init(dev)) {
+	if (nouveau_pm_init(dev)) {
 		NV_ERROR(dev, "Failed to initialize power management\n");
 	}
 
@@ -614,7 +614,7 @@ int nouveau_unload(struct drm_device *dev)
 		nouveau_close(dev);
 	}
 
-	if (pscnv_pm_fini(dev)) {
+	if (nouveau_pm_fini(dev)) {
 		NV_ERROR(dev, "Failed to initialize power management\n");
 	}
 

@@ -5,7 +5,7 @@
 #include "nouveau_bios.h"
 
 static uint32_t
-pscnv_get_pll_refclk(struct drm_device *dev, uint32_t reg)
+nouveau_get_pll_refclk(struct drm_device *dev, uint32_t reg)
 {
 	struct pll_lims pll;
 	if (get_pll_limits(dev, reg, &pll))
@@ -15,7 +15,7 @@ pscnv_get_pll_refclk(struct drm_device *dev, uint32_t reg)
 }
 
 static void
-pscnv_parse_clock_regs(uint32_t reg0, uint32_t reg1,
+nouveau_parse_clock_regs(uint32_t reg0, uint32_t reg1,
 					   uint32_t *m, uint32_t *n, uint32_t *p) {
 	*p = (reg0 & 0x70000) >> 16;
 	*m = reg1 & 0xff;
@@ -23,84 +23,84 @@ pscnv_parse_clock_regs(uint32_t reg0, uint32_t reg1,
 }
 
 static uint32_t
-pscnv_calculate_frequency(struct drm_device *dev,
+nouveau_calculate_frequency(struct drm_device *dev,
 						  uint32_t refclk, uint32_t reg0, uint32_t reg1)
 {
 	uint32_t p,m,n;
-	pscnv_parse_clock_regs(reg0, reg1, &m, &n, &p);
+	nouveau_parse_clock_regs(reg0, reg1, &m, &n, &p);
 
-	/*NV_INFO(dev, "pscnv_calculate_frequency: ref_clk=0x%x, reg0=0x%x, reg1=0x%x, p=0x%x, m=0x%x, n=0x%x\n",
+	/*NV_INFO(dev, "nouveau_calculate_frequency: ref_clk=0x%x, reg0=0x%x, reg1=0x%x, p=0x%x, m=0x%x, n=0x%x\n",
 			refclk, reg0, reg1, p, m, n);*/
 
 	return ((n*refclk/m) >> p);
 }
 
 static uint32_t
-pscnv_get_core_clocks(struct drm_device *dev)
+nouveau_get_core_clocks(struct drm_device *dev)
 {
 	uint32_t reg0=nv_rd32(dev, 0x4028);
 	uint32_t reg1=nv_rd32(dev, 0x402c);
-	uint32_t refclk=pscnv_get_pll_refclk(dev, 0x4028);
+	uint32_t refclk=nouveau_get_pll_refclk(dev, 0x4028);
 
-	return pscnv_calculate_frequency(dev, refclk, reg0, reg1);
+	return nouveau_calculate_frequency(dev, refclk, reg0, reg1);
 }
 
 static uint32_t
-pscnv_set_core_clocks(struct drm_device *dev, uint32_t clock_speed)
+nouveau_set_core_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
 	return setPLL(dev->dev_private, 0x4028, clock_speed);
 }
 
 static uint32_t
-pscnv_get_shader_clocks(struct drm_device *dev)
+nouveau_get_shader_clocks(struct drm_device *dev)
 {
 	uint32_t reg0=nv_rd32(dev, 0x4020);
 	uint32_t reg1=nv_rd32(dev, 0x4024);
-	uint32_t refclk=pscnv_get_pll_refclk(dev, 0x4020);
+	uint32_t refclk=nouveau_get_pll_refclk(dev, 0x4020);
 
-	return pscnv_calculate_frequency(dev, refclk, reg0, reg1);
+	return nouveau_calculate_frequency(dev, refclk, reg0, reg1);
 }
 
 static uint32_t
-pscnv_set_shader_clocks(struct drm_device *dev, uint32_t clock_speed)
+nouveau_set_shader_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
 	return setPLL(dev->dev_private, 0x4020, clock_speed);
 }
 
 static uint32_t
-pscnv_get_core_unknown_clocks(struct drm_device *dev)
+nouveau_get_core_unknown_clocks(struct drm_device *dev)
 {
 	uint32_t reg0=nv_rd32(dev, 0x4030);
 	uint32_t reg1=nv_rd32(dev, 0x4034);
-	uint32_t refclk=pscnv_get_pll_refclk(dev, 0x4030);
+	uint32_t refclk=nouveau_get_pll_refclk(dev, 0x4030);
 
-	return pscnv_calculate_frequency(dev, refclk, reg0, reg1);
+	return nouveau_calculate_frequency(dev, refclk, reg0, reg1);
 }
 
 /*static uint32_t
-pscnv_set_core_unknown_clocks(struct drm_device *dev, uint32_t clock_speed)
+nouveau_set_core_unknown_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
 	return setPLL(dev->dev_private, 0x4030, clock_speed);
 }*/
 
 static uint32_t
-pscnv_get_memory_clocks(struct drm_device *dev)
+nouveau_get_memory_clocks(struct drm_device *dev)
 {
 	uint32_t reg0=nv_rd32(dev, 0x4008);
 	uint32_t reg1=nv_rd32(dev, 0x400c);
-	uint32_t refclk=pscnv_get_pll_refclk(dev, 0x4008);
+	uint32_t refclk=nouveau_get_pll_refclk(dev, 0x4008);
 
-	return pscnv_calculate_frequency(dev, refclk, reg0, reg1);
+	return nouveau_calculate_frequency(dev, refclk, reg0, reg1);
 }
 
 static uint32_t
-pscnv_set_memory_clocks(struct drm_device *dev, uint32_t clock_speed)
+nouveau_set_memory_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
 	return setPLL(dev->dev_private, 0x4008, clock_speed);
 }
 
 static uint32_t
-pscnv_nv40_sensor_setup(struct drm_device *dev)
+nouveau_nv40_sensor_setup(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
 	struct pm_temp_sensor_setup *sensor_setup = &dev_p->vbios.pm.sensor_setup;
@@ -126,7 +126,7 @@ pscnv_nv40_sensor_setup(struct drm_device *dev)
 }
 
 static uint32_t
-pscnv_get_gpu_temperature(struct drm_device *dev)
+nouveau_get_gpu_temperature(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
 
@@ -145,7 +145,7 @@ pscnv_get_gpu_temperature(struct drm_device *dev)
 
 		/* Setup the sensor if the temperature is 0 */
 		if (temp == 0)
-			temp = pscnv_nv40_sensor_setup(dev);
+			temp = nouveau_nv40_sensor_setup(dev);
 
 		temp = temp * sensor_setup->slope_mult / sensor_setup->slope_div;
 		temp = temp + offset + sensor_setup->temp_constant;
@@ -166,7 +166,7 @@ pscnv_get_gpu_temperature(struct drm_device *dev)
  * does not return the correct voltage
  */
 static uint32_t
-pscnv_get_voltage(struct drm_device *dev)
+nouveau_get_voltage(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
 	uint8_t voltage_entry_count = dev_p->vbios.pm.voltage_entry_count;
@@ -230,7 +230,7 @@ pscnv_get_voltage(struct drm_device *dev)
  * The voltage should be in 10mV
  */
 static uint32_t
-pscnv_set_voltage(struct drm_device *dev, uint8_t voltage)
+nouveau_set_voltage(struct drm_device *dev, uint8_t voltage)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
 	uint8_t voltage_entry_count = dev_p->vbios.pm.voltage_entry_count;
@@ -248,7 +248,7 @@ pscnv_set_voltage(struct drm_device *dev, uint8_t voltage)
 		NV_INFO(dev, "PM: voltage should not be zero - Aborting \n");
 		return 0;
 	}
-	if (pscnv_get_voltage(dev) == voltage) {
+	if (nouveau_get_voltage(dev) == voltage) {
 		NV_INFO(dev, "PM: The same voltage has already been set\n");
 		return 0;
 	}
@@ -304,10 +304,10 @@ pscnv_set_voltage(struct drm_device *dev, uint8_t voltage)
  *****************************************/
 
 static int
-pscnv_is_the_current_pm_entry(struct drm_device *dev,
+nouveau_is_the_current_pm_entry(struct drm_device *dev,
 							  struct pm_mode_info* pm_mode)
 {
-	uint32_t cur_gpu_clock = pscnv_get_core_clocks(dev);
+	uint32_t cur_gpu_clock = nouveau_get_core_clocks(dev);
 
 	uint32_t clock_diff = pm_mode->coreclk - cur_gpu_clock;
 	clock_diff = clock_diff>0?clock_diff:-clock_diff;
@@ -316,7 +316,7 @@ pscnv_is_the_current_pm_entry(struct drm_device *dev,
 }
 
 static ssize_t
-pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
+nouveau_pm_mode_to_string(struct drm_device *dev, unsigned id,
 						char *buf, ssize_t len)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
@@ -328,13 +328,13 @@ pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 	pm_mode = &dev_p->vbios.pm.pm_modes[id];
 	
 	return snprintf(buf, len, "%s%u: core %u MHz/shader %u MHz/memory %u MHz/%u mV\n",
-					pscnv_is_the_current_pm_entry(dev, pm_mode)?"*":" ",
+					nouveau_is_the_current_pm_entry(dev, pm_mode)?"*":" ",
 					id, pm_mode->coreclk/1000, pm_mode->shaderclk/1000,
 					pm_mode->memclk/1000, pm_mode->voltage*10);
 }
 
 static ssize_t
-pscnv_voltage_to_string(struct drm_device *dev, unsigned id,
+nouveau_voltage_to_string(struct drm_device *dev, unsigned id,
 						char *buf, ssize_t len)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
@@ -346,13 +346,13 @@ pscnv_voltage_to_string(struct drm_device *dev, unsigned id,
 	v_entry = &dev_p->vbios.pm.voltages[id];
 
 	return snprintf(buf, len, "%s%u: %u mV\n",
-					v_entry->voltage==pscnv_get_voltage(dev)?"*":" ",
+					v_entry->voltage==nouveau_get_voltage(dev)?"*":" ",
 					id,
 					v_entry->voltage*10);
 }
 
 static ssize_t
-pscnv_sysfs_get_pm_status(struct device *dev,
+nouveau_sysfs_get_pm_status(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -374,34 +374,34 @@ pscnv_sysfs_get_pm_status(struct device *dev,
 									"GPU critical temp  : %u °C\n"
 									"\n"
 									"--- Voltages ---\n",
-									pscnv_get_core_clocks(ddev),
-									pscnv_get_core_unknown_clocks(ddev),
-									pscnv_get_shader_clocks(ddev),
-									pscnv_get_memory_clocks(ddev),
-									pscnv_get_gpu_temperature(ddev),
+									nouveau_get_core_clocks(ddev),
+									nouveau_get_core_unknown_clocks(ddev),
+									nouveau_get_shader_clocks(ddev),
+									nouveau_get_memory_clocks(ddev),
+									nouveau_get_gpu_temperature(ddev),
 									dev_p->vbios.pm.temp_fan_boost,
 									dev_p->vbios.pm.temp_throttling,
 									dev_p->vbios.pm.temp_critical
 					);
 
 	for (i=0; i<dev_p->vbios.pm.voltage_entry_count; i++)
-		ret_length += pscnv_voltage_to_string(ddev, i,
+		ret_length += nouveau_voltage_to_string(ddev, i,
 											 buf+ret_length, PAGE_SIZE-ret_length);
 
 	ret_length += snprintf(buf+ret_length, PAGE_SIZE-ret_length,
 						   "\n--- PM Modes ---\n");
 
 	for (i=0; i<dev_p->vbios.pm.mode_info_count; i++)
-		ret_length += pscnv_pm_mode_to_string(ddev, i,
+		ret_length += nouveau_pm_mode_to_string(ddev, i,
 											 buf+ret_length, PAGE_SIZE-ret_length);
 	
 	return ret_length;
 }
-static DEVICE_ATTR(pm_status, S_IRUGO, pscnv_sysfs_get_pm_status, NULL);
+static DEVICE_ATTR(pm_status, S_IRUGO, nouveau_sysfs_get_pm_status, NULL);
 
 
 static ssize_t
-pscnv_sysfs_get_pm_mode(struct device *dev,
+nouveau_sysfs_get_pm_mode(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -410,12 +410,12 @@ pscnv_sysfs_get_pm_mode(struct device *dev,
 	unsigned pos=0, i=0;
 	
 	for (i=0; i<dev_priv->vbios.pm.mode_info_count; i++)
-		pos += pscnv_pm_mode_to_string(ddev, i, buf+pos, PAGE_SIZE-pos);
+		pos += nouveau_pm_mode_to_string(ddev, i, buf+pos, PAGE_SIZE-pos);
 
 	return pos;
 }
 static ssize_t
-pscnv_sysfs_set_pm_mode(struct device *dev,
+nouveau_sysfs_set_pm_mode(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf,
 				    size_t count)
@@ -428,10 +428,10 @@ pscnv_sysfs_set_pm_mode(struct device *dev,
 	if (profile < dev_p->vbios.pm.mode_info_count) {
 		pm_mode = &dev_p->vbios.pm.pm_modes[profile];
 
-		pscnv_set_core_clocks(ddev, pm_mode->coreclk);
-		pscnv_set_shader_clocks(ddev, pm_mode->shaderclk);
-		pscnv_set_memory_clocks(ddev, pm_mode->memclk);
-		pscnv_set_voltage(ddev, pm_mode->voltage);
+		nouveau_set_core_clocks(ddev, pm_mode->coreclk);
+		nouveau_set_shader_clocks(ddev, pm_mode->shaderclk);
+		nouveau_set_memory_clocks(ddev, pm_mode->memclk);
+		nouveau_set_voltage(ddev, pm_mode->voltage);
 
 		/* TODO: Set the core unknown speed */
 
@@ -442,22 +442,22 @@ pscnv_sysfs_set_pm_mode(struct device *dev,
 	
 	return count;
 }
-static DEVICE_ATTR(pm_mode, S_IRUGO | S_IWUSR, pscnv_sysfs_get_pm_mode,
-				   pscnv_sysfs_set_pm_mode);
+static DEVICE_ATTR(pm_mode, S_IRUGO | S_IWUSR, nouveau_sysfs_get_pm_mode,
+				   nouveau_sysfs_set_pm_mode);
 
 static ssize_t
-pscnv_sysfs_get_temperature(struct device *dev,
+nouveau_sysfs_get_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
 	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
 
-	return snprintf(buf, PAGE_SIZE, "%u °C\n", pscnv_get_gpu_temperature(ddev));
+	return snprintf(buf, PAGE_SIZE, "%u °C\n", nouveau_get_gpu_temperature(ddev));
 }
-static DEVICE_ATTR(temp_gpu, S_IRUGO, pscnv_sysfs_get_temperature, NULL);
+static DEVICE_ATTR(temp_gpu, S_IRUGO, nouveau_sysfs_get_temperature, NULL);
 
 static ssize_t
-pscnv_sysfs_get_critical_temperature(struct device *dev,
+nouveau_sysfs_get_critical_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -467,7 +467,7 @@ pscnv_sysfs_get_critical_temperature(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u °C\n", dev_p->vbios.pm.temp_critical);
 }
 static ssize_t
-pscnv_sysfs_set_critical_temperature(struct device *dev,
+nouveau_sysfs_set_critical_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf,
 				    size_t count)
@@ -493,12 +493,12 @@ pscnv_sysfs_set_critical_temperature(struct device *dev,
 	return count;
 }
 static DEVICE_ATTR(temp_critical, S_IRUGO | S_IWUSR,
-				   pscnv_sysfs_get_critical_temperature,
-				   pscnv_sysfs_set_critical_temperature
+				   nouveau_sysfs_get_critical_temperature,
+				   nouveau_sysfs_set_critical_temperature
   				);
 
 static ssize_t
-pscnv_sysfs_get_throttling_temperature(struct device *dev,
+nouveau_sysfs_get_throttling_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -508,7 +508,7 @@ pscnv_sysfs_get_throttling_temperature(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u °C\n", dev_p->vbios.pm.temp_throttling);
 }
 static ssize_t
-pscnv_sysfs_set_throttling_temperature(struct device *dev,
+nouveau_sysfs_set_throttling_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf,
 				    size_t count)
@@ -534,12 +534,12 @@ pscnv_sysfs_set_throttling_temperature(struct device *dev,
 	return count;
 }
 static DEVICE_ATTR(temp_throttling, S_IRUGO | S_IWUSR,
-				   pscnv_sysfs_get_throttling_temperature,
-				   pscnv_sysfs_set_throttling_temperature
+				   nouveau_sysfs_get_throttling_temperature,
+				   nouveau_sysfs_set_throttling_temperature
   				);
 
 static ssize_t
-pscnv_sysfs_get_fan_boost_temperature(struct device *dev,
+nouveau_sysfs_get_fan_boost_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -549,7 +549,7 @@ pscnv_sysfs_get_fan_boost_temperature(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u °C\n", dev_p->vbios.pm.temp_fan_boost);
 }
 static ssize_t
-pscnv_sysfs_set_fan_boost_temperature(struct device *dev,
+nouveau_sysfs_set_fan_boost_temperature(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf,
 				    size_t count)
@@ -575,12 +575,12 @@ pscnv_sysfs_set_fan_boost_temperature(struct device *dev,
 	return count;
 }
 static DEVICE_ATTR(temp_fan_boost, S_IRUGO | S_IWUSR,
-				   pscnv_sysfs_get_fan_boost_temperature,
-				   pscnv_sysfs_set_fan_boost_temperature
+				   nouveau_sysfs_get_fan_boost_temperature,
+				   nouveau_sysfs_set_fan_boost_temperature
   				);
 
 static ssize_t
-pscnv_sysfs_get_voltage(struct device *dev,
+nouveau_sysfs_get_voltage(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
@@ -589,12 +589,12 @@ pscnv_sysfs_get_voltage(struct device *dev,
 	unsigned pos=0, i=0;
 
 	for (i=0; i<dev_priv->vbios.pm.voltage_entry_count; i++)
-		pos += pscnv_voltage_to_string(ddev, i, buf+pos, PAGE_SIZE-pos);
+		pos += nouveau_voltage_to_string(ddev, i, buf+pos, PAGE_SIZE-pos);
 
 	return pos;
 }
 static ssize_t
-pscnv_sysfs_set_voltage(struct device *dev,
+nouveau_sysfs_set_voltage(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf,
 				    size_t count)
@@ -608,19 +608,19 @@ pscnv_sysfs_set_voltage(struct device *dev,
 		return count;
 
 	v_entry = &dev_p->vbios.pm.voltages[id];
-	pscnv_set_voltage(ddev, v_entry->voltage);
+	nouveau_set_voltage(ddev, v_entry->voltage);
 
 	return count;
 }
-static DEVICE_ATTR(pm_voltage, S_IRUGO | S_IWUSR, pscnv_sysfs_get_voltage,
-				   pscnv_sysfs_set_voltage);
+static DEVICE_ATTR(pm_voltage, S_IRUGO | S_IWUSR, nouveau_sysfs_get_voltage,
+				   nouveau_sysfs_set_voltage);
 
 /******************************************
  *            Main functions              *
  *****************************************/
 
 int
-pscnv_pm_init(struct drm_device* dev)
+nouveau_pm_init(struct drm_device* dev)
 {
 	/*struct drm_nouveau_private *dev_priv = dev->dev_private;*/
 	int ret;
@@ -661,7 +661,7 @@ pscnv_pm_init(struct drm_device* dev)
 }
 
 int
-pscnv_pm_fini(struct drm_device* dev)
+nouveau_pm_fini(struct drm_device* dev)
 {
 	/*struct drm_nouveau_private *dev_priv = dev->dev_private;*/
 
