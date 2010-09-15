@@ -36,42 +36,6 @@ pscnv_calculate_frequency(struct drm_device *dev,
 }
 
 static uint32_t
-pscnv_pm_clock_to(struct drm_device *dev, uint32_t reg0_addr,
-						uint32_t reg1_addr, uint32_t wanted_clock_speed) {
-	uint32_t p,m,n, clock_diff;
-	uint32_t reg0=nv_rd32(dev, reg0_addr);
-	uint32_t reg1=nv_rd32(dev, reg1_addr);
-	uint32_t refclk=pscnv_get_pll_refclk(dev, reg0_addr);
-
-	pscnv_parse_clock_regs(reg0, reg1, &m, &n, &p);
-
-	/* TODO: Find a better way to get closer to the needed clock */
-	/* See http://cgit.freedesktop.org/nouveau/linux-2.6/tree/drivers/gpu/drm/nouveau/nouveau_calc.c */
-	n = ((wanted_clock_speed)<< p) / (refclk/m);
-
-	/* Calculate the new reg1 */
-	reg1 &= 0xFFFF00FF;
-	reg1 |= n<<8;
-
-	/* Check the difference between the wanted clock and the obtained clock
-	 * is not too big
-	 */
-	clock_diff = wanted_clock_speed-pscnv_calculate_frequency(dev, refclk, reg0, reg1);
-	if (clock_diff <= wanted_clock_speed/10 || clock_diff >= wanted_clock_speed/10) {
-		NV_ERROR(dev, "Will set the 0x%x clock to %u kHz. Clockdiff=%u kHz.\n",
-				 reg0_addr, wanted_clock_speed, clock_diff);
-
-		/* TODO: Un-comment this when the better pll calculation formula is done */
-		/*return 1;*/
-	}
-
-	/* Write the new reg1 */
-	nv_wr32(dev, reg1_addr, reg1);
-
-	return 0;
-}
-
-static uint32_t
 pscnv_get_core_clocks(struct drm_device *dev)
 {
 	uint32_t reg0=nv_rd32(dev, 0x4028);
@@ -84,7 +48,7 @@ pscnv_get_core_clocks(struct drm_device *dev)
 static uint32_t
 pscnv_set_core_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
-	return pscnv_pm_clock_to(dev, 0x4028, 0x402c, clock_speed);
+	return setPLL(dev->dev_private, 0x4028, clock_speed);
 }
 
 static uint32_t
@@ -100,7 +64,7 @@ pscnv_get_shader_clocks(struct drm_device *dev)
 static uint32_t
 pscnv_set_shader_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
-	return pscnv_pm_clock_to(dev, 0x4020, 0x4024, clock_speed);
+	return setPLL(dev->dev_private, 0x4020, clock_speed);
 }
 
 static uint32_t
@@ -113,11 +77,11 @@ pscnv_get_core_unknown_clocks(struct drm_device *dev)
 	return pscnv_calculate_frequency(dev, refclk, reg0, reg1);
 }
 
-static uint32_t
+/*static uint32_t
 pscnv_set_core_unknown_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
-	return pscnv_pm_clock_to(dev, 0x4030, 0x4034, clock_speed);
-}
+	return setPLL(dev->dev_private, 0x4030, clock_speed);
+}*/
 
 static uint32_t
 pscnv_get_memory_clocks(struct drm_device *dev)
@@ -132,7 +96,7 @@ pscnv_get_memory_clocks(struct drm_device *dev)
 static uint32_t
 pscnv_set_memory_clocks(struct drm_device *dev, uint32_t clock_speed)
 {
-	return pscnv_pm_clock_to(dev, 0x4008, 0x400c, clock_speed);
+	return setPLL(dev->dev_private, 0x4008, clock_speed);
 }
 
 static uint32_t
@@ -332,6 +296,18 @@ pscnv_set_voltage(struct drm_device *dev, uint8_t voltage)
  *              Sysfs Fun                 *
  *****************************************/
 
+static int
+pscnv_is_the_current_pm_entry(struct drm_device *dev,
+							  struct pm_mode_info* pm_mode)
+{
+	uint32_t cur_gpu_clock = pscnv_get_core_clocks(dev);
+
+	uint32_t clock_diff = pm_mode->coreclk - cur_gpu_clock;
+	clock_diff = clock_diff>0?clock_diff:-clock_diff;
+
+	return clock_diff<pm_mode->coreclk/100;
+}
+
 static ssize_t
 pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 						char *buf, ssize_t len)
@@ -345,7 +321,7 @@ pscnv_pm_mode_to_string(struct drm_device *dev, unsigned id,
 	pm_mode = &dev_p->vbios.pm.pm_modes[id];
 	
 	return snprintf(buf, len, "%s%u: core %u MHz/shader %u MHz/memory %u MHz/%u mV\n",
-					pm_mode->coreclk==pscnv_get_core_clocks(dev)?"*":" ",
+					pscnv_is_the_current_pm_entry(dev, pm_mode)?"*":" ",
 					id, pm_mode->coreclk/1000, pm_mode->shaderclk/1000,
 					pm_mode->memclk/1000, pm_mode->voltage*10);
 }
@@ -449,6 +425,8 @@ pscnv_sysfs_set_pm_mode(struct device *dev,
 		pscnv_set_shader_clocks(ddev, pm_mode->shaderclk);
 		pscnv_set_memory_clocks(ddev, pm_mode->memclk);
 		pscnv_set_voltage(ddev, pm_mode->voltage);
+
+		/* TODO: Set the core unknown speed */
 
 		/* TODO: Set the timings */
 

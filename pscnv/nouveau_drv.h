@@ -663,6 +663,7 @@ extern struct dcb_connector_table_entry *
 nouveau_bios_connector_entry(struct drm_device *, int index);
 extern int get_pll_limits(struct drm_device *, uint32_t limit_match,
 			  struct pll_lims *);
+extern int setPLL(struct nvbios *bios, uint32_t reg, uint32_t clk);
 extern int nouveau_bios_run_display_table(struct drm_device *,
 					  struct dcb_entry *,
 					  uint32_t script, int pxclk);

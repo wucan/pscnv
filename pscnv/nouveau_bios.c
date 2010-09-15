@@ -661,8 +661,8 @@ nv50_pll_set(struct drm_device *dev, uint32_t reg, uint32_t clk)
 	return 0;
 }
 
-static int
-setPLL(struct nvbios *bios, uint32_t reg, uint32_t clk)
+int
+setPLL(struct nvbios *bios, uint32_t reg, uint32_t clk) /* used to be static */
 {
 	struct drm_device *dev = bios->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
