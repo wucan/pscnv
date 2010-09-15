@@ -170,7 +170,7 @@ pscnv_get_voltage(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_p = dev->dev_private;
 	uint8_t voltage_entry_count = dev_p->vbios.pm.voltage_entry_count;
-	uint32_t tmp_index, index, i;
+	uint32_t tmp_index, index, i, reg;
 
 	if (dev_p->chipset < 0x50) {
 		NV_INFO(dev, "PM: Voltage readings are not currently supported"
@@ -218,7 +218,11 @@ pscnv_get_voltage(struct drm_device *dev)
 	}
 
 	/* None found printf message and exit */
-	NV_ERROR(dev, "PM: The current voltage's id used by the card is unknown.\n");
+	reg = dev_p->chipset>=0x50?0xe104:0x60081c;
+	NV_ERROR(dev, "PM: The current voltage's id used by the card is unknown."
+				  "Please report reg 0x%x=0x%x to nouveau devs.\n",
+				  reg, nv_rd32(dev, reg));
+				
 	return -EINVAL;
 }
 
@@ -280,15 +284,18 @@ pscnv_set_voltage(struct drm_device *dev, uint8_t voltage)
 				tmp_index = 0x111;
 				break;
 			default:
-				NV_ERROR(dev, "PM: Voltage index %d does not appear to be valid. Please report\n", dev_p->vbios.pm.voltages[i].index);
+				NV_ERROR(dev, "PM: Voltage index %d does not appear to be valid."
+							  "Please report to nouveau devs\n",
+							  dev_p->vbios.pm.voltages[i].index);
 				return -EINVAL;
 			}
-			nv_wr32(dev, 0xe104, (nv_rd32(dev, 0xe104) & 0x666fffff) | (tmp_index << 20));
+			nv_wr32(dev, 0xe104, (nv_rd32(dev, 0xe104)&0x666fffff) | (tmp_index<< 20));
 			return 0;
 		}
 	}
 	/* None found printf message and exit */
-	NV_ERROR(dev, "The specified Voltage %dmV does not have a index\n", voltage*10);
+	NV_ERROR(dev, "The specified Voltage %dmV does not have a index\n",
+			 voltage*10);
 	return -EINVAL;
 }
 
