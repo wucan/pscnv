@@ -1,5 +1,5 @@
 #include "drmP.h"
-#include "pscnv_pm.h"
+#include "nouveau_pm.h"
 
 #include "nouveau_drv.h"
 #include "nouveau_bios.h"

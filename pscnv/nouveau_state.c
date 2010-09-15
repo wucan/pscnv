@@ -41,7 +41,7 @@
 #include "pscnv_chan.h"
 #include "pscnv_fifo.h"
 #include "pscnv_ioctl.h"
-#include "pscnv_pm.h"
+#include "nouveau_pm.h"
 
 static void nouveau_stub_takedown(struct drm_device *dev) {}
 static int nouveau_stub_init(struct drm_device *dev) { return 0; }
