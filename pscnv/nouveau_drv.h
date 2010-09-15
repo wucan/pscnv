@@ -401,6 +401,10 @@ struct drm_nouveau_private {
 
 	struct nouveau_fbdev *nfbdev;
 	struct apertures_struct *apertures;
+
+	struct nouveau_pm {
+		struct notifier_block acpi_nb;
+	} pm;
 };
 #if 0
 static inline struct drm_nouveau_private *

@@ -4,6 +4,11 @@
 #include "nouveau_drv.h"
 #include "nouveau_bios.h"
 
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
+#include <linux/power_supply.h>
+
 static uint32_t
 nouveau_get_pll_refclk(struct drm_device *dev, uint32_t reg)
 {
@@ -298,6 +303,43 @@ nouveau_set_voltage(struct drm_device *dev, uint8_t voltage)
 			 voltage*10);
 	return -EINVAL;
 }
+
+static int
+nouveau_pm_update_state(struct drm_device *dev)
+{
+	/*TODO: Check the current temperature*/  
+
+	/*TODO: Set the best PM mode*/
+	
+	return 0;
+}
+
+/******************************************
+ *              Dynamic PM                *
+ *****************************************/
+#define ACPI_AC_CLASS           "ac_adapter"
+
+#ifdef CONFIG_ACPI
+static int nouveau_acpi_event(struct notifier_block *nb,
+			     unsigned long val,
+			     void *data)
+{
+	struct drm_nouveau_private *ddev = container_of(nb, struct drm_nouveau_private, pm.acpi_nb);
+	struct drm_device *dev = ddev->dev;
+	struct acpi_bus_event *entry = (struct acpi_bus_event *)data;
+
+	if (strcmp(entry->device_class, ACPI_AC_CLASS) == 0) {
+		if (power_supply_is_system_supplied() > 0)
+			NV_INFO(dev, "PM: Power source is AC.\n");
+		else
+			NV_INFO(dev, "PM: Power source is DC\n");
+
+		nouveau_pm_update_state(dev);
+	}
+
+	return NOTIFY_OK;
+}
+#endif
 
 /******************************************
  *              Sysfs Fun                 *
@@ -622,7 +664,7 @@ static DEVICE_ATTR(pm_voltage, S_IRUGO | S_IWUSR, nouveau_sysfs_get_voltage,
 int
 nouveau_pm_init(struct drm_device* dev)
 {
-	/*struct drm_nouveau_private *dev_priv = dev->dev_private;*/
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int ret;
 
 	/* Parse the vbios PM-related bits */
@@ -656,6 +698,13 @@ nouveau_pm_init(struct drm_device* dev)
 	ret = device_create_file(dev->dev, &dev_attr_pm_voltage);
 	if (ret)
 		NV_ERROR(dev, "failed to create device file for fan_boost_temp.\n");
+	
+#ifdef CONFIG_ACPI
+	dev_priv->pm.acpi_nb.notifier_call = nouveau_acpi_event;
+	register_acpi_notifier(&dev_priv->pm.acpi_nb);
+#endif
+
+	nouveau_pm_update_state(dev);
 
 	return 0;
 }
@@ -663,7 +712,7 @@ nouveau_pm_init(struct drm_device* dev)
 int
 nouveau_pm_fini(struct drm_device* dev)
 {
-	/*struct drm_nouveau_private *dev_priv = dev->dev_private;*/
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
 	device_remove_file(dev->dev, &dev_attr_pm_status);
 	device_remove_file(dev->dev, &dev_attr_pm_mode);
@@ -673,5 +722,8 @@ nouveau_pm_fini(struct drm_device* dev)
 	device_remove_file(dev->dev, &dev_attr_temp_fan_boost);
 	device_remove_file(dev->dev, &dev_attr_pm_voltage);
 	
+#ifdef CONFIG_ACPI
+	unregister_acpi_notifier(&dev_priv->pm.acpi_nb);
+#endif
 	return 0;
 }
