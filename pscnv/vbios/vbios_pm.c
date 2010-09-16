@@ -84,58 +84,56 @@ vbios_pmtable_parse_temperatures(struct drm_device *dev, struct nvbios *bios)
 		}
 	}
 
-	/* Set sane default values */
-	bios->pm.temp_critical = 110;
-	bios->pm.temp_throttling = 100;
-	bios->pm.temp_fan_boost = 90;
+	/* set data_ptr to the entry start point */
+	data_ptr = bios->pm.temperature_tbl_ptr + header_length;
 
 	/* Read the entries from the table */
 	for (i=0, e=0; i<entry_count; i++) {
 		uint16_t value;
 
-		/* set data_ptr to the entry start point */
-		data_ptr = bios->pm.temperature_tbl_ptr +
-					header_length + i*entry_size;
-
 		value = ROM16(bios->data[data_ptr+1]);
-		switch(bios->data[data_ptr+0])
-		{
-			case 0x01:
-				value = (value&0x8f) == 0 ? (value >> 9) & 0x7f : 0;
-				bios->pm.sensor_setup.temp_constant = value;
-				break;
+		switch(bios->data[data_ptr+0]) {
+		case 0x01:
+			value = (value&0x8f) == 0 ? (value >> 9) & 0x7f : 0;
+			bios->pm.sensor_setup.temp_constant = value;
+			break;
 
-			case 0x04:
+		case 0x04:
+			if ((value & 0xf00f) == 0xa000) // core
 				bios->pm.temp_critical = (value&0x0ff0) >> 4;
-				break;
+			break;
 
-			case 0x07:
+		case 0x07:
+			if ((value & 0xf00f) == 0xa000) // core
 				bios->pm.temp_throttling = (value&0x0ff0) >> 4;
-				break;
+			break;
 
-			case 0x08:
+		case 0x08:
+			if ((value & 0xf00f) == 0xa000) // core
 				bios->pm.temp_fan_boost = (value&0x0ff0) >> 4;
-				break;
+			break;
 
-			case 0x10:
-				bios->pm.sensor_setup.offset_mult = value;
-				break;
+		case 0x10:
+			bios->pm.sensor_setup.offset_mult = value;
+			break;
 
-			case 0x11:
-				bios->pm.sensor_setup.offset_div = value;
-				break;
+		case 0x11:
+			bios->pm.sensor_setup.offset_div = value;
+			break;
 
-			case 0x12:
-				bios->pm.sensor_setup.slope_mult = value;
-				break;
+		case 0x12:
+			bios->pm.sensor_setup.slope_mult = value;
+			break;
 
-			case 0x13:
-				bios->pm.sensor_setup.slope_div = value;
-				break;
+		case 0x13:
+			bios->pm.sensor_setup.slope_div = value;
+			break;
 		}
+		data_ptr += entry_size;
 	}
 
 	/* Check the values written in the table */
+	/* There is difference in those values depending on the type of gpu - desktop/mobile/igp */
 	if (bios->pm.temp_critical > 120)
 		bios->pm.temp_critical = 120;
 	if (bios->pm.temp_throttling > 110)
