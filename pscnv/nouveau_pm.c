@@ -146,11 +146,11 @@ nouveau_get_gpu_temperature(struct drm_device *dev)
 			temp = nv_rd32(dev, 0x20008);
 		} else {
 			temp = nv_rd32(dev, 0x0015b4);
+			/* Setup the sensor if the temperature is 0 */
+			if (temp == 0)
+				temp = nouveau_nv40_sensor_setup(dev);
 		}
 
-		/* Setup the sensor if the temperature is 0 */
-		if (temp == 0)
-			temp = nouveau_nv40_sensor_setup(dev);
 
 		temp = temp * sensor_setup->slope_mult / sensor_setup->slope_div;
 		temp = temp + offset + sensor_setup->temp_constant;
